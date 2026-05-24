@@ -36,7 +36,8 @@ def generate_replies(client, profile: PersonaProfile, test_posts: list[dict]) ->
 
     for test_post in test_posts:
         user_content = (
-            f"Iemand heeft het volgende gepost op het forum:\n\n"
+            f"Forum: {test_post['forum']} | Thread: {test_post['thread_title']}\n\n"
+            f"Iemand heeft het volgende gepost:\n\n"
             f"\"{test_post['post']}\"\n\n"
             f"Schrijf een reactie zoals {profile.original_username} dat zou doen."
         )

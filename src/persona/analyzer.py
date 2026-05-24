@@ -30,7 +30,7 @@ _SCHEMA_DESCRIPTION = """{
 def _format_posts(posts: list[dict]) -> str:
     lines = []
     for p in posts:
-        lines.append(f"[{p['date']} | {p['forum_name']}] {p['content']}")
+        lines.append(f"[{p['date']} | {p['forum_name']} | {p['thread_title']}] {p['content']}")
     return "\n".join(lines)
 
 

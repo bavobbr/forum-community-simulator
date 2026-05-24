@@ -2,26 +2,36 @@
   {
     "id": 1,
     "label": "Politiek debat",
+    "forum": "Zwam",
+    "thread_title": "Politiek algemeen",
     "post": "Wtf, hoe kunnen ze dit gedaan hebben? Ik snap echt niet hoe mensen nog op die idioten stemmen. Ge moet blind zijn om dat ni te zien."
   },
   {
     "id": 2,
     "label": "Gaming hot take",
+    "forum": "Videogames",
+    "thread_title": "Welke spellekes zijde mee bezig",
     "post": "Hebben jullie al de nieuwe Zelda gespeeld? Is't goed of typisch weer overhyped Nintendo gedoe voor de fanboys?"
   },
   {
     "id": 3,
     "label": "Directe banter",
+    "forum": "Zwam",
+    "thread_title": "Zwam algemeen",
     "post": "Ge kunt toch echt nie spelen hoor, zagen we wel genoeg gisteren. Absolute bot lol"
   },
   {
     "id": 4,
     "label": "Film mening",
-    "post": "Inception is de beste film aller tijden en als ge dat nie begrijpt zijt ge gewoon te dom. Fight me."
+    "forum": "Film & TV",
+    "thread_title": "Beste films aller tijden",
+    "post": "Inception is de beste film aller tijden en als ge dat ni begrijpt zijt ge gewoon te dom. Fight me."
   },
   {
     "id": 5,
     "label": "Agressieve tegenstand",
+    "forum": "Zwam",
+    "thread_title": "Zwam algemeen",
     "post": "Dat is echt de domste mening die ik ooit gelezen heb op dit forum. Serieus, hoe durft ge dat te typen."
   }
 ]

@@ -24,8 +24,8 @@ def _make_profile() -> PersonaProfile:
 
 
 _TEST_POSTS = [
-    {"id": 1, "label": "Politiek debat", "post": "Wtf, hoe kunnen ze dit gedaan hebben?"},
-    {"id": 2, "label": "Gaming hot take", "post": "Is de nieuwe Zelda goed?"},
+    {"id": 1, "label": "Politiek debat", "forum": "Zwam", "thread_title": "Politiek algemeen", "post": "Wtf, hoe kunnen ze dit gedaan hebben?"},
+    {"id": 2, "label": "Gaming hot take", "forum": "Videogames", "thread_title": "Welke spellekes zijde mee bezig", "post": "Is de nieuwe Zelda goed?"},
 ]
 
 
@@ -78,3 +78,5 @@ def test_generate_replies_api_receives_test_post_content():
     call_kwargs = mock_client.messages.create.call_args[1]
     user_content = call_kwargs["messages"][0]["content"]
     assert "Wtf, hoe kunnen ze dit gedaan hebben?" in user_content
+    assert "Zwam" in user_content
+    assert "Politiek algemeen" in user_content
