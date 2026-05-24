@@ -97,7 +97,13 @@ class PostScraper:
         else:
             search_id = self._search_ids.get(user_id)
             if not search_id:
-                raise ValueError(f"No searchid for user {user_id}. Call page=1 first.")
+                # searchid cache lost (e.g. workbench restarted) — re-establish via page 1
+                time.sleep(self.delay)
+                setup_html = self.session.get(f"search.php?do=finduser&u={user_id}&pp=100")
+                search_id = parse_search_id(setup_html)
+                if not search_id:
+                    raise ValueError(f"No searchid for user {user_id} — user may have no posts")
+                self._search_ids[user_id] = search_id
             html = self.session.get(f"search.php?searchid={search_id}&pp=100&page={page}")
 
         posts = parse_posts_page(html)

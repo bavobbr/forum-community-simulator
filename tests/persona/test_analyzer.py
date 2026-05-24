@@ -68,7 +68,7 @@ def test_analyze_first_batch_returns_profile():
     assert isinstance(profile, PersonaProfile)
     assert profile.user_id == 119
     assert profile.posts_analyzed == 2
-    assert profile.pages_loaded == 1
+    assert profile.pages_loaded == 0
     assert profile.dialect_markers == ["ge", "ni", "da", "wss"]
     assert profile.formality == "very_casual"
     assert profile.daily_cap == 5

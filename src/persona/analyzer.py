@@ -89,7 +89,6 @@ def analyze_first_batch(client, alter: dict, posts: list[dict]) -> PersonaProfil
     if data:
         _apply_analysis(profile, data)
         profile.posts_analyzed = len(posts)
-        profile.pages_loaded = 1
 
     return profile
 

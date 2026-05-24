@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import anthropic
@@ -17,7 +18,8 @@ _TEST_POSTS_PATH = Path("config/test_posts.json")
 
 
 def _persona_path(username: str) -> Path:
-    return _PERSONAS_DIR / f"{username}.json"
+    safe = re.sub(r'[^\w\-]', '_', username)
+    return _PERSONAS_DIR / f"{safe}.json"
 
 
 def _load_profile(alter: dict) -> PersonaProfile:
@@ -168,7 +170,10 @@ def _run_persona_workbench(
                 path = _persona_path(username)
                 console.print(f"[dim]Bewerk: {path.resolve()}[/dim]")
                 console.input("Druk Enter als klaar...")
-                profile = PersonaProfile.from_dict(json.loads(path.read_text(encoding="utf-8")))
+                try:
+                    profile = PersonaProfile.from_dict(json.loads(path.read_text(encoding="utf-8")))
+                except (json.JSONDecodeError, KeyError) as exc:
+                    console.print(f"[red]Ongeldig JSON — profiel niet herladen: {exc}[/red]")
             elif choice == "q":
                 return
             else:

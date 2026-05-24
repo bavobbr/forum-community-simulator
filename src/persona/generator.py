@@ -1,3 +1,5 @@
+import logging
+
 from src.persona.models import PersonaProfile
 
 _MODEL = "claude-sonnet-4-6"
@@ -49,7 +51,6 @@ def generate_replies(client, profile: PersonaProfile, test_posts: list[dict]) ->
             if response.stop_reason == "max_tokens":
                 reply += " [afgekapt]"
         except Exception as exc:
-            import logging
             logging.warning("generate_replies failed for post %r: %s", test_post.get("id"), exc)
             reply = "[generatie mislukt]"
 
