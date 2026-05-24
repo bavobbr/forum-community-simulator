@@ -15,19 +15,23 @@ class VBulletinSession:
 
     def login(self, username: str, password: str) -> bool:
         md5_password = hashlib.md5(password.encode()).hexdigest()
-        resp = self.session.post(
+        self.session.post(
             f"{self.base_url}/login.php?do=login",
             data={
                 "vb_login_username": username,
+                "vb_login_password": "",
                 "vb_login_md5password": md5_password,
                 "vb_login_md5password_utf": md5_password,
                 "cookieuser": "1",
                 "do": "login",
                 "s": "",
+                "securitytoken": "guest",
             },
             allow_redirects=True,
         )
-        return "Log Out" in resp.text or "User CP" in resp.text
+        # VBulletin's POST response is a splash page — verify by checking index
+        index = self.session.get(f"{self.base_url}/index.php")
+        return "Log Out" in index.text or "User CP" in index.text
 
     def get(self, path: str) -> str:
         resp = self.session.get(f"{self.base_url}/{path.lstrip('/')}")
