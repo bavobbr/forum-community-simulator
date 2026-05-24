@@ -25,7 +25,18 @@ def main() -> None:
     password = os.getenv("FORUM_PASSWORD")
     search_delay = int(os.getenv("SEARCH_DELAY", "6"))
 
-    alters = json.loads(_APPROVED_ACCOUNTS.read_text(encoding="utf-8"))
+    if not username or not password:
+        console.print("[red]FORUM_USERNAME of FORUM_PASSWORD ontbreekt in .env[/red]")
+        return
+
+    try:
+        alters = json.loads(_APPROVED_ACCOUNTS.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        console.print(f"[red]Bestand niet gevonden: {_APPROVED_ACCOUNTS}[/red]")
+        return
+    except json.JSONDecodeError as exc:
+        console.print(f"[red]Ongeldig JSON in {_APPROVED_ACCOUNTS}: {exc}[/red]")
+        return
     console.print(f"[bold]{len(alters)} alter egos geladen.[/bold]")
 
     console.print("[bold]Inloggen op forum...[/bold]")
