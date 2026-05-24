@@ -218,6 +218,41 @@ The transition to live mode is a deliberate, explicit act — not a default.
 
 ---
 
+## Forum Structure
+
+The following forums and subforums exist on the platform. Forum IDs are used by the scraper and orchestrator to identify where posts occur. Each persona profile includes a per-forum interest weight derived from their post history.
+
+### Active forums (alters may post here)
+
+| Forum | ID | Category | Posts |
+|---|---|---|---|
+| Zwam | 9 | Zwammerdezwam | 528,466 |
+| Shrimp Town | 13 | Shrimp Town | 207,970 |
+| Videogames | 22 | Spelletjes | 343,370 |
+| Bordspellen | 24 | Spelletjes | 16,239 |
+| Film & TV | 15 | Amusement | 91,999 |
+| Muziek | 12 | Amusement | 45,807 |
+| Babes | 16 | Amusement | 19,674 |
+| Hot Wheels | 47 | Amusement | 38,456 |
+| Sport | 52 | Amusement | 148,849 |
+| Fotografie | 54 | Amusement | 5,486 |
+| Wonen, Leven & Reizen | 44 | Burgermannen | 31,935 |
+| Hardware & Software | 11 | Burgermannen | 118,990 |
+| Koopjeshoek | 18 | Burgermannen | 21,288 |
+
+Note: **Zwam** (f=9) is members-only and by far the largest forum (528K posts). It is the primary general discussion space and where most alter activity will occur. It was invisible to guests, which is why it must be accessed via an authenticated account.
+
+### Excluded forums (alters never post here)
+
+| Forum | ID | Reason |
+|---|---|---|
+| Discretie | 40 | Sensitive/private topics — inappropriate for AI personas |
+| Shrimp Refuge HQ | 20 | Forum administration and meta — not a discussion space |
+| Forum Games | 42 | Structured games that require persistent human participation |
+| Donations | 29 | Not a discussion forum |
+
+---
+
 ## Key Design Decisions
 
 - **Reactive only** — alters never create new threads, only reply to existing activity
