@@ -16,8 +16,6 @@ def parse_posts_page(html: str) -> list[dict]:
 
     for table in soup.find_all("table", id=_POST_ID_PATTERN):
         post_id_match = _POST_ID_PATTERN.match(table["id"])
-        if not post_id_match:
-            continue
         post_id = int(post_id_match.group(1))
 
         thead = table.find("td", class_="thead")
@@ -93,8 +91,9 @@ class PostScraper:
         if page == 1:
             html = self.session.get(f"search.php?do=finduser&u={user_id}&pp=100")
             search_id = parse_search_id(html)
-            if search_id:
-                self._search_ids[user_id] = search_id
+            if not search_id:
+                raise ValueError(f"No searchid in page 1 response for user {user_id} — user may have no posts")
+            self._search_ids[user_id] = search_id
         else:
             search_id = self._search_ids.get(user_id)
             if not search_id:

@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 from src.persona.scraper import parse_posts_page, parse_search_id, parse_has_next_page
 
