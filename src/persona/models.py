@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 
 
 @dataclass
@@ -47,46 +47,23 @@ class PersonaProfile:
     @classmethod
     def from_alter_ego(cls, alter: dict) -> "PersonaProfile":
         return cls(
-            user_id=alter["user_id"],
+            user_id=int(alter["user_id"]),
             original_username=alter["original_username"],
             reversed_username=alter["reversed_username"],
-            post_count=alter["post_count"],
+            post_count=int(alter["post_count"]),
             last_active=alter["last_active"],
         )
 
     def to_dict(self) -> dict:
-        return {
-            "user_id": self.user_id,
-            "original_username": self.original_username,
-            "reversed_username": self.reversed_username,
-            "post_count": self.post_count,
-            "last_active": self.last_active,
-            "posts_analyzed": self.posts_analyzed,
-            "pages_loaded": self.pages_loaded,
-            "is_approved": self.is_approved,
-            "dialect_markers": self.dialect_markers,
-            "formality": self.formality,
-            "sentence_length": self.sentence_length,
-            "bbcode_habits": self.bbcode_habits,
-            "punctuation_style": self.punctuation_style,
-            "topic_weights": self.topic_weights,
-            "opinion_fingerprint": self.opinion_fingerprint,
-            "frequent_interactions": self.frequent_interactions,
-            "peak_hours": self.peak_hours,
-            "typical_post_length": self.typical_post_length,
-            "daily_cap": self.daily_cap,
-            "hourly_cap": self.hourly_cap,
-            "example_posts": self.example_posts,
-            "persona_summary": self.persona_summary,
-        }
+        return asdict(self)
 
     @classmethod
     def from_dict(cls, d: dict) -> "PersonaProfile":
         return cls(
-            user_id=d["user_id"],
+            user_id=int(d["user_id"]),
             original_username=d["original_username"],
             reversed_username=d["reversed_username"],
-            post_count=d["post_count"],
+            post_count=int(d["post_count"]),
             last_active=d["last_active"],
             posts_analyzed=d.get("posts_analyzed", 0),
             pages_loaded=d.get("pages_loaded", 0),

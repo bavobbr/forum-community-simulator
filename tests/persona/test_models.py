@@ -30,6 +30,9 @@ def test_to_dict_round_trips():
     profile.dialect_markers = ["ge", "da", "ni"]
     profile.example_posts = ["post one", "post two"]
     profile.persona_summary = "Direct, flemish gamer"
+    profile.topic_weights = {"Videogames": 0.8}
+    profile.frequent_interactions = {"radje": "rival"}
+    profile.peak_hours = [18, 19]
 
     d = profile.to_dict()
     restored = PersonaProfile.from_dict(d)
@@ -40,6 +43,9 @@ def test_to_dict_round_trips():
     assert restored.dialect_markers == ["ge", "da", "ni"]
     assert restored.example_posts == ["post one", "post two"]
     assert restored.persona_summary == "Direct, flemish gamer"
+    assert restored.topic_weights == {"Videogames": 0.8}
+    assert restored.frequent_interactions == {"radje": "rival"}
+    assert restored.peak_hours == [18, 19]
 
 
 def test_from_dict_handles_missing_optional_fields():
