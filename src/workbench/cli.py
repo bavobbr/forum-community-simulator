@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 
 import anthropic
@@ -46,8 +45,11 @@ def _show_persona_list(console: Console, alters: list[dict]) -> None:
     table.add_column("Analyzed", justify="right")
     table.add_column("Status", min_width=14)
 
+    approved = 0
     for i, alter in enumerate(alters, 1):
         profile = _load_profile(alter)
+        if profile.is_approved:
+            approved += 1
         status = "[green]✓ approved[/green]" if profile.is_approved else (
             f"[yellow]{profile.posts_analyzed} posts[/yellow]" if profile.posts_analyzed > 0
             else "[dim]not started[/dim]"
@@ -60,7 +62,6 @@ def _show_persona_list(console: Console, alters: list[dict]) -> None:
             status,
         )
 
-    approved = sum(1 for a in alters if _load_profile(a).is_approved)
     console.print(Panel(table, title=f"Personas — {approved}/{len(alters)} approved"))
 
 
