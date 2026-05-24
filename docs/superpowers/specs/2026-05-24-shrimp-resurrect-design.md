@@ -119,7 +119,7 @@ Load next 100 posts
     → If not: load next 100 posts and repeat
 ```
 
-A persona is flagged as **ready** when all test post samples are rated in-character across two consecutive iterations without profile changes.
+A persona is flagged as **ready** when all test post samples are rated in-character across two consecutive iterations with no manual profile edits between them.
 
 ### Human Validation
 
