@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from src.persona.models import PersonaProfile
 from src.persona.analyzer import analyze_first_batch, refine_with_batch
 

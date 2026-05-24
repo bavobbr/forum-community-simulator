@@ -68,27 +68,28 @@ def analyze_first_batch(client, alter: dict, posts: list[dict]) -> PersonaProfil
 
     prompt = (
         f"Analyseer de volgende {len(posts)} forumberichten van gebruiker "
-        f'"{alter["original_username"]}" (user_id: {alter["user_id"]}).\n\n'
+        f'"{alter["original_username"]}" (user_id: {alter["user_id"]}, totaal {alter["post_count"]} posts op het forum).\n\n'
         f"Berichten:\n{posts_text}\n\n"
         f"Geef een JSON object terug met dit schema:\n{_SCHEMA_DESCRIPTION}\n\n"
         f"Kies maximaal 20 representatieve verbatim posts als example_posts. "
         f"Geef enkel het JSON object terug, geen uitleg."
     )
 
+    response = client.messages.create(
+        model=_MODEL,
+        max_tokens=3000,
+        system=_SYSTEM,
+        messages=[{"role": "user", "content": prompt}],
+    )
     try:
-        response = client.messages.create(
-            model=_MODEL,
-            max_tokens=2000,
-            system=_SYSTEM,
-            messages=[{"role": "user", "content": prompt}],
-        )
         data = _parse_json_response(response.content[0].text)
-        if data:
-            _apply_analysis(profile, data)
-            profile.posts_analyzed = len(posts)
-            profile.pages_loaded = 1
-    except Exception:
-        pass
+    except (AttributeError, IndexError):
+        data = None
+
+    if data:
+        _apply_analysis(profile, data)
+        profile.posts_analyzed = len(posts)
+        profile.pages_loaded = 1
 
     return profile
 
@@ -108,19 +109,20 @@ def refine_with_batch(client, profile: PersonaProfile, posts: list[dict]) -> Per
         f"Geef enkel het JSON object terug, geen uitleg."
     )
 
+    response = client.messages.create(
+        model=_MODEL,
+        max_tokens=3000,
+        system=_SYSTEM,
+        messages=[{"role": "user", "content": prompt}],
+    )
     try:
-        response = client.messages.create(
-            model=_MODEL,
-            max_tokens=2000,
-            system=_SYSTEM,
-            messages=[{"role": "user", "content": prompt}],
-        )
         data = _parse_json_response(response.content[0].text)
-        if data:
-            _apply_analysis(profile, data)
-            profile.posts_analyzed += len(posts)
-            profile.pages_loaded += 1
-    except Exception:
-        pass
+    except (AttributeError, IndexError):
+        data = None
+
+    if data:
+        _apply_analysis(profile, data)
+        profile.posts_analyzed += len(posts)
+        profile.pages_loaded += 1
 
     return profile
