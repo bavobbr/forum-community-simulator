@@ -27,7 +27,7 @@ def main():
     username = os.getenv("FORUM_USERNAME")
     password = os.getenv("FORUM_PASSWORD")
     inactivity_years = int(os.getenv("INACTIVITY_YEARS", "2"))
-    search_delay = int(os.getenv("SEARCH_DELAY", "15"))
+    search_delay = int(os.getenv("SEARCH_DELAY", "6"))
 
     console.print("[bold]Logging in...[/bold]")
     session = VBulletinSession()
