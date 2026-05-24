@@ -53,6 +53,7 @@ def test_generate_replies_result_structure():
         assert "label" in r
         assert "post" in r
         assert "reply" in r
+        assert "id" in r
         assert r["reply"] == "Da weet ik nie hoor"
 
 

@@ -46,7 +46,11 @@ def generate_replies(client, profile: PersonaProfile, test_posts: list[dict]) ->
                 messages=[{"role": "user", "content": user_content}],
             )
             reply = response.content[0].text
-        except Exception:
+            if response.stop_reason == "max_tokens":
+                reply += " [afgekapt]"
+        except Exception as exc:
+            import logging
+            logging.warning("generate_replies failed for post %r: %s", test_post.get("id"), exc)
             reply = "[generatie mislukt]"
 
         results.append({
