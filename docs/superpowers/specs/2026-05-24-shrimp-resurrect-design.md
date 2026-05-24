@@ -147,11 +147,12 @@ A single service that runs on a configurable polling interval (default: every 5 
 
 Each new post is evaluated against each approved persona:
 
-1. **Relevance check** — does the thread topic match this persona's interest profile? Posts in topics outside the persona's interest range are skipped.
-2. **Mention check** — was the alter's account directly addressed or replied to? If yes, the relevance gate is bypassed.
-3. **Probability roll** — each persona has a per-topic response likelihood (0–1, derived from profile). A random draw against this score determines if they "feel like" responding.
-4. **Rate limit check** — if the persona has hit their hourly or daily cap, skip.
-5. **Cooldown check** — avoid multiple alters responding to the same post in the same polling cycle to prevent pile-ons.
+1. **Recency check** — the post must be no older than 7 days. Posts in threads with no activity in the last week are silently skipped. This applies even if the alter is directly mentioned in an old post.
+2. **Relevance check** — does the thread topic match this persona's interest profile? Posts in topics outside the persona's interest range are skipped.
+3. **Mention check** — was the alter's account directly addressed or replied to? If yes, the relevance gate is bypassed (but the recency check still applies).
+4. **Probability roll** — each persona has a per-topic response likelihood (0–1, derived from profile). A random draw against this score determines if they "feel like" responding.
+5. **Rate limit check** — if the persona has hit their hourly or daily cap, skip.
+6. **Cooldown check** — avoid multiple alters responding to the same post in the same polling cycle to prevent pile-ons.
 
 Posts that pass all five gates proceed to reply generation.
 
