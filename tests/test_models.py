@@ -26,3 +26,9 @@ def test_alter_ego_to_dict():
     assert d["reversed_username"] == "ejdar"
     assert d["post_count"] == 8432
     assert d["last_active"] == "2023-11-04"
+
+def test_alter_ego_to_dict_none_last_active():
+    m = Member(user_id=1, username="test", post_count=0, last_active=None)
+    a = AlterEgo.from_member(m)
+    d = a.to_dict()
+    assert d["last_active"] is None
