@@ -1,4 +1,3 @@
-import logging
 from src.llm import call_llm_raw
 from src.persona.models import PersonaProfile
 from src.persona.generator import build_system_prompt
