@@ -44,6 +44,9 @@ class PersonaProfile:
     example_posts: list[str] = field(default_factory=list)
     persona_summary: str = ""
 
+    # Event orchestrator — None means manual approval only
+    auto_approve_minutes: int | None = None
+
     @classmethod
     def from_alter_ego(cls, alter: dict) -> "PersonaProfile":
         return cls(
@@ -82,4 +85,5 @@ class PersonaProfile:
             hourly_cap=d.get("hourly_cap", 3),
             example_posts=d.get("example_posts", []),
             persona_summary=d.get("persona_summary", ""),
+            auto_approve_minutes=d.get("auto_approve_minutes", None),
         )

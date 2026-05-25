@@ -61,3 +61,22 @@ def test_from_dict_handles_missing_optional_fields():
     assert profile.hourly_cap == 3
     assert profile.topic_weights == {}
     assert profile.opinion_fingerprint == []
+
+
+def test_auto_approve_minutes_defaults_to_none():
+    p = PersonaProfile.from_alter_ego({
+        "user_id": 1, "original_username": "a", "reversed_username": "b",
+        "post_count": 1, "last_active": "2023-01-01",
+    })
+    assert p.auto_approve_minutes is None
+
+
+def test_auto_approve_minutes_round_trips():
+    p = PersonaProfile.from_alter_ego({
+        "user_id": 1, "original_username": "a", "reversed_username": "b",
+        "post_count": 1, "last_active": "2023-01-01",
+    })
+    p.auto_approve_minutes = 10
+    d = p.to_dict()
+    p2 = PersonaProfile.from_dict(d)
+    assert p2.auto_approve_minutes == 10
