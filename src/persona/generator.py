@@ -1,8 +1,6 @@
 import logging
-
+from src.llm import call_llm_raw
 from src.persona.models import PersonaProfile
-
-_MODEL = "claude-sonnet-4-6"
 
 
 def build_system_prompt(profile: PersonaProfile) -> str:
@@ -30,7 +28,7 @@ def build_system_prompt(profile: PersonaProfile) -> str:
     )
 
 
-def generate_replies(client, profile: PersonaProfile, test_posts: list[dict]) -> list[dict]:
+def generate_replies(profile: PersonaProfile, test_posts: list[dict]) -> list[dict]:
     system = build_system_prompt(profile)
     results = []
 
@@ -42,14 +40,9 @@ def generate_replies(client, profile: PersonaProfile, test_posts: list[dict]) ->
             f"Schrijf een reactie zoals {profile.original_username} dat zou doen."
         )
         try:
-            response = client.messages.create(
-                model=_MODEL,
-                max_tokens=400,
-                system=system,
-                messages=[{"role": "user", "content": user_content}],
-            )
-            reply = response.content[0].text
-            if response.stop_reason == "max_tokens":
+            resp = call_llm_raw(system, user_content, 400)
+            reply = resp.text
+            if resp.candidates[0].finish_reason.name == "MAX_TOKENS":
                 reply += " [afgekapt]"
         except Exception as exc:
             logging.warning("generate_replies failed for post %r: %s", test_post.get("id"), exc)

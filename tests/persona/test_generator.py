@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from src.persona.models import PersonaProfile
 from src.persona.generator import generate_replies, build_system_prompt
 
@@ -29,26 +29,23 @@ _TEST_POSTS = [
 ]
 
 
+def _make_mock_resp(text="Typische radje reply", finish_reason="STOP"):
+    resp = MagicMock()
+    resp.text = text
+    resp.candidates[0].finish_reason.name = finish_reason
+    return resp
+
+
 def test_generate_replies_returns_one_per_test_post():
-    mock_client = MagicMock()
-    mock_message = MagicMock()
-    mock_message.content = [MagicMock(text="Typische radje reply")]
-    mock_client.messages.create.return_value = mock_message
-
-    results = generate_replies(mock_client, _make_profile(), _TEST_POSTS)
-
+    with patch("src.persona.generator.call_llm_raw", return_value=_make_mock_resp()) as mock_raw:
+        results = generate_replies(_make_profile(), _TEST_POSTS)
     assert len(results) == 2
-    assert mock_client.messages.create.call_count == 2
+    assert mock_raw.call_count == 2
 
 
 def test_generate_replies_result_structure():
-    mock_client = MagicMock()
-    mock_message = MagicMock()
-    mock_message.content = [MagicMock(text="Da weet ik nie hoor")]
-    mock_client.messages.create.return_value = mock_message
-
-    results = generate_replies(mock_client, _make_profile(), _TEST_POSTS)
-
+    with patch("src.persona.generator.call_llm_raw", return_value=_make_mock_resp("Da weet ik nie hoor")):
+        results = generate_replies(_make_profile(), _TEST_POSTS)
     for r in results:
         assert "label" in r
         assert "post" in r
@@ -68,15 +65,15 @@ def test_build_system_prompt_includes_persona_info():
 
 
 def test_generate_replies_api_receives_test_post_content():
-    mock_client = MagicMock()
-    mock_message = MagicMock()
-    mock_message.content = [MagicMock(text="reply")]
-    mock_client.messages.create.return_value = mock_message
-
-    generate_replies(mock_client, _make_profile(), _TEST_POSTS[:1])
-
-    call_kwargs = mock_client.messages.create.call_args[1]
-    user_content = call_kwargs["messages"][0]["content"]
+    with patch("src.persona.generator.call_llm_raw", return_value=_make_mock_resp()) as mock_raw:
+        generate_replies(_make_profile(), _TEST_POSTS[:1])
+    _system, user_content, _max = mock_raw.call_args[0]
     assert "Wtf, hoe kunnen ze dit gedaan hebben?" in user_content
     assert "Zwam" in user_content
     assert "Politiek algemeen" in user_content
+
+
+def test_generate_replies_appends_afgekapt_on_max_tokens():
+    with patch("src.persona.generator.call_llm_raw", return_value=_make_mock_resp("Lang antwoord", "MAX_TOKENS")):
+        results = generate_replies(_make_profile(), _TEST_POSTS[:1])
+    assert results[0]["reply"] == "Lang antwoord [afgekapt]"
