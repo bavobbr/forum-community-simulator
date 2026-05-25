@@ -52,9 +52,9 @@ def generate_replies(profile: PersonaProfile, test_posts: list[dict]) -> list[di
     for test_post in test_posts:
         user_content = (
             f"Forum: {test_post['forum']} | Thread: {test_post['thread_title']}\n\n"
-            f"Iemand heeft het volgende gepost:\n\n"
+            f"[Reageer op dit bericht:]\n"
             f"\"{test_post['post']}\"\n\n"
-            f"Schrijf één forumreactie zoals {profile.original_username} dat zou doen. "
+            f"Schrijf één forumreactie zoals {profile.reversed_username} dat zou doen. "
             f"Schrijf alleen de reactietekst zelf — geen uitleg, geen opmaak, geen opsomming. "
             f"Citeer de post NIET."
         )
