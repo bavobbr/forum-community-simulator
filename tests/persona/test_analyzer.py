@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock
+from unittest.mock import patch
 from src.persona.models import PersonaProfile
 from src.persona.analyzer import analyze_first_batch, refine_with_batch
 
@@ -44,27 +44,18 @@ _MOCK_ANALYSIS_RESPONSE = {
     "persona_summary": "Direct en nuchter gamer uit Vlaanderen. Schrijft in dialect, kort en bondig.",
 }
 
-
-def _make_mock_client(response_dict: dict) -> MagicMock:
-    mock_client = MagicMock()
-    mock_message = MagicMock()
-    mock_message.content = [MagicMock(text=json.dumps(response_dict))]
-    mock_client.messages.create.return_value = mock_message
-    return mock_client
+_ALTER = {
+    "user_id": 119,
+    "original_username": "radje",
+    "reversed_username": "ejdar",
+    "post_count": 8432,
+    "last_active": "2026-03-09",
+}
 
 
 def test_analyze_first_batch_returns_profile():
-    alter = {
-        "user_id": 119,
-        "original_username": "radje",
-        "reversed_username": "ejdar",
-        "post_count": 8432,
-        "last_active": "2026-03-09",
-    }
-    mock_client = _make_mock_client(_MOCK_ANALYSIS_RESPONSE)
-
-    profile = analyze_first_batch(mock_client, alter, _SAMPLE_POSTS)
-
+    with patch("src.persona.analyzer.call_llm", return_value=json.dumps(_MOCK_ANALYSIS_RESPONSE)):
+        profile = analyze_first_batch(_ALTER, _SAMPLE_POSTS)
     assert isinstance(profile, PersonaProfile)
     assert profile.user_id == 119
     assert profile.posts_analyzed == 2
@@ -77,62 +68,30 @@ def test_analyze_first_batch_returns_profile():
 
 
 def test_analyze_first_batch_calls_api_with_posts():
-    alter = {
-        "user_id": 119,
-        "original_username": "radje",
-        "reversed_username": "ejdar",
-        "post_count": 8432,
-        "last_active": "2026-03-09",
-    }
-    mock_client = _make_mock_client(_MOCK_ANALYSIS_RESPONSE)
-
-    analyze_first_batch(mock_client, alter, _SAMPLE_POSTS)
-
-    mock_client.messages.create.assert_called_once()
-    call_kwargs = mock_client.messages.create.call_args[1]
-    prompt = call_kwargs["messages"][0]["content"]
-    assert "radje" in prompt
-    assert "mewgenics" in prompt
+    with patch("src.persona.analyzer.call_llm", return_value=json.dumps(_MOCK_ANALYSIS_RESPONSE)) as mock_llm:
+        analyze_first_batch(_ALTER, _SAMPLE_POSTS)
+    mock_llm.assert_called_once()
+    _system, user_prompt, _max = mock_llm.call_args[0]
+    assert "radje" in user_prompt
+    assert "mewgenics" in user_prompt
 
 
 def test_refine_with_batch_updates_existing_profile():
-    alter = {
-        "user_id": 119,
-        "original_username": "radje",
-        "reversed_username": "ejdar",
-        "post_count": 8432,
-        "last_active": "2026-03-09",
-    }
-    existing = PersonaProfile.from_alter_ego(alter)
+    existing = PersonaProfile.from_alter_ego(_ALTER)
     existing.posts_analyzed = 100
     existing.pages_loaded = 1
     existing.dialect_markers = ["ge", "ni"]
-
     updated_response = dict(_MOCK_ANALYSIS_RESPONSE)
     updated_response["dialect_markers"] = ["ge", "ni", "da", "wss", "zever"]
-    mock_client = _make_mock_client(updated_response)
-
-    updated = refine_with_batch(mock_client, existing, _SAMPLE_POSTS)
-
+    with patch("src.persona.analyzer.call_llm", return_value=json.dumps(updated_response)):
+        updated = refine_with_batch(existing, _SAMPLE_POSTS)
     assert updated.posts_analyzed == 102
     assert updated.pages_loaded == 2
     assert "da" in updated.dialect_markers
 
 
 def test_analyze_handles_malformed_json_gracefully():
-    alter = {
-        "user_id": 119,
-        "original_username": "radje",
-        "reversed_username": "ejdar",
-        "post_count": 8432,
-        "last_active": "2026-03-09",
-    }
-    mock_client = MagicMock()
-    mock_message = MagicMock()
-    mock_message.content = [MagicMock(text="this is not json {{{")]
-    mock_client.messages.create.return_value = mock_message
-
-    # Should not raise; returns blank profile from alter
-    profile = analyze_first_batch(mock_client, alter, _SAMPLE_POSTS)
+    with patch("src.persona.analyzer.call_llm", return_value="this is not json {{{"):
+        profile = analyze_first_batch(_ALTER, _SAMPLE_POSTS)
     assert profile.user_id == 119
-    assert profile.posts_analyzed == 0  # unchanged on failure
+    assert profile.posts_analyzed == 0

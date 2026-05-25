@@ -1,8 +1,7 @@
 import json
 import re
+from src.llm import call_llm
 from src.persona.models import PersonaProfile
-
-_MODEL = "claude-sonnet-4-6"
 
 _SYSTEM = (
     "Je bent een expert in het analyseren van online forum gedrag van Nederlandstalige gebruikers. "
@@ -67,7 +66,7 @@ def _apply_analysis(profile: PersonaProfile, data: dict) -> None:
     profile.persona_summary = data.get("persona_summary", profile.persona_summary)
 
 
-def analyze_first_batch(client, alter: dict, posts: list[dict]) -> PersonaProfile:
+def analyze_first_batch(alter: dict, posts: list[dict]) -> PersonaProfile:
     profile = PersonaProfile.from_alter_ego(alter)
     posts_text = _format_posts(posts)
 
@@ -81,16 +80,8 @@ def analyze_first_batch(client, alter: dict, posts: list[dict]) -> PersonaProfil
         f"Geef enkel het JSON object terug, geen uitleg."
     )
 
-    response = client.messages.create(
-        model=_MODEL,
-        max_tokens=3000,
-        system=_SYSTEM,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    try:
-        data = _parse_json_response(response.content[0].text)
-    except (AttributeError, IndexError):
-        data = None
+    text = call_llm(_SYSTEM, prompt, 3000)
+    data = _parse_json_response(text)
 
     if data:
         _apply_analysis(profile, data)
@@ -99,7 +90,7 @@ def analyze_first_batch(client, alter: dict, posts: list[dict]) -> PersonaProfil
     return profile
 
 
-def refine_with_batch(client, profile: PersonaProfile, posts: list[dict]) -> PersonaProfile:
+def refine_with_batch(profile: PersonaProfile, posts: list[dict]) -> PersonaProfile:
     posts_text = _format_posts(posts)
     current_json = json.dumps(profile.to_dict(), ensure_ascii=False, indent=2)
 
@@ -115,16 +106,8 @@ def refine_with_batch(client, profile: PersonaProfile, posts: list[dict]) -> Per
         f"Geef enkel het JSON object terug, geen uitleg."
     )
 
-    response = client.messages.create(
-        model=_MODEL,
-        max_tokens=3000,
-        system=_SYSTEM,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    try:
-        data = _parse_json_response(response.content[0].text)
-    except (AttributeError, IndexError):
-        data = None
+    text = call_llm(_SYSTEM, prompt, 3000)
+    data = _parse_json_response(text)
 
     if data:
         _apply_analysis(profile, data)
