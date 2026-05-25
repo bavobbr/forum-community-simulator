@@ -13,3 +13,4 @@ venv/
 # Persona profiles (contain scraped post data)
 personas/
 event.db
+.playwright-mcp/
