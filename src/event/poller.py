@@ -1,10 +1,24 @@
 import os
+import re
 import logging
 from datetime import datetime, timezone, timedelta
 
 from src.persona.scraper import parse_posts_page
 
 _EXCLUDED_FORUM_IDS = {20, 29, 40, 42}
+_META_REFRESH_RE = re.compile(
+    r'<meta[^>]+http-equiv=["\']refresh["\'][^>]+url=["\']?([^"\'>\s]+)', re.IGNORECASE
+)
+
+
+def _follow_meta_refresh(session, html: str) -> str:
+    """If the page contains a meta-refresh redirect, follow it and return the target HTML."""
+    m = _META_REFRESH_RE.search(html)
+    if not m:
+        return html
+    url = m.group(1)
+    logging.debug("getnew: following meta-refresh to %s", url)
+    return session.get(url)
 
 
 def fetch_new_posts(session) -> list[dict]:
@@ -16,6 +30,7 @@ def fetch_new_posts(session) -> list[dict]:
         session.login(os.getenv("FORUM_USERNAME", ""), os.getenv("FORUM_PASSWORD", ""))
         html = session.get("search.php?do=getnew")
 
+    html = _follow_meta_refresh(session, html)
     posts = parse_posts_page(html)
     return [p for p in posts if p["forum_id"] not in _EXCLUDED_FORUM_IDS]
 
