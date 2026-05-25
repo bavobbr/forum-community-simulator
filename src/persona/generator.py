@@ -37,7 +37,8 @@ def build_system_prompt(profile: PersonaProfile) -> str:
         f"- Bij een onbekend onderwerp: redeneer vanuit de wereldvisie en retorische patronen hierboven\n"
         f"- Je mag VBulletin BBCode gebruiken (b, i, quote, url) als het bij de stijl past\n"
         f"- Harde taal en banter zijn acceptabel als het past bij de persoon\n"
-        f"- Reageer kort als de persoon kort schrijft, lang als de persoon lang schrijft"
+        f"- Reageer kort als de persoon kort schrijft, lang als de persoon lang schrijft\n"
+        f"- Voeg GEEN externe URLs of links toe — deze zijn vaak fout of dood"
     )
 
 

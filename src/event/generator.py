@@ -21,8 +21,9 @@ def generate_reply(
         f"[Vorige berichten in de thread:]\n{context_lines}\n\n"
         f"[Nieuw bericht van {triggering_post['author']}:]\n"
         f"\"{triggering_post['content']}\"\n\n"
-        f"Schrijf een reactie zoals {profile.reversed_username} dat zou doen. "
-        f"Citeer de post NIET — schrijf alleen je eigen reactie."
+        f"Schrijf één forumreactie zoals {profile.reversed_username} dat zou doen. "
+        f"Schrijf alleen de reactietekst zelf — geen uitleg, geen opmaak, geen opsomming. "
+        f"Citeer de post NIET."
     )
 
     resp = call_llm_raw(system, user_content, 2048)
