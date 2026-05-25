@@ -18,7 +18,7 @@ def test_call_llm_uses_pro_model():
         mock_client.models.generate_content.return_value = mock_resp
         llm_module.call_llm("mijn systeem", "mijn vraag", 400)
     call_kwargs = mock_client.models.generate_content.call_args[1]
-    assert call_kwargs["model"] == "gemini-3.1-pro"
+    assert call_kwargs["model"] == "gemini-3.1-pro-preview"
     assert call_kwargs["contents"] == ["mijn vraag"]
 
 
@@ -47,6 +47,6 @@ def test_call_llm_raw_accepts_model_override():
     mock_resp.text = "x"
     with patch.object(llm_module, "_client") as mock_client:
         mock_client.models.generate_content.return_value = mock_resp
-        llm_module.call_llm_raw("s", "u", 400, model="gemini-3.1-pro")
+        llm_module.call_llm_raw("s", "u", 400, model="gemini-3.1-pro-preview")
     call_kwargs = mock_client.models.generate_content.call_args[1]
-    assert call_kwargs["model"] == "gemini-3.1-pro"
+    assert call_kwargs["model"] == "gemini-3.1-pro-preview"

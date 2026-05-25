@@ -1,9 +1,13 @@
 import hashlib
 import os
+import re
 import requests
 from dotenv import load_dotenv
 
 load_dotenv()
+
+_TOKEN_RE = re.compile(r"SECURITYTOKEN\s*=\s*['\"]([^'\"]+)['\"]")
+
 
 class VBulletinSession:
     def __init__(self):
@@ -12,6 +16,11 @@ class VBulletinSession:
         self.session.headers["User-Agent"] = (
             "Mozilla/5.0 (compatible; ShrimpResurrect/1.0)"
         )
+        self._security_token: str = "guest"
+
+    @property
+    def security_token(self) -> str:
+        return self._security_token
 
     def login(self, username: str, password: str) -> bool:
         md5_password = hashlib.md5(password.encode()).hexdigest()
@@ -31,7 +40,12 @@ class VBulletinSession:
         )
         # VBulletin's POST response is a splash page — verify by checking index
         index = self.session.get(f"{self.base_url}/index.php")
-        return "Log Out" in index.text or "User CP" in index.text
+        logged_in = "Log Out" in index.text or "User CP" in index.text
+        if logged_in:
+            m = _TOKEN_RE.search(index.text)
+            if m:
+                self._security_token = m.group(1)
+        return logged_in
 
     def get(self, path: str) -> str:
         resp = self.session.get(f"{self.base_url}/{path.lstrip('/')}")

@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 from rich import box
@@ -66,22 +67,92 @@ def _show_persona_list(console: Console, alters: list[dict]) -> None:
     console.print(Panel(table, title=f"Personas — {approved}/{len(alters)} approved"))
 
 
+def _show_profile_summary(console: Console, profile: PersonaProfile) -> None:
+    dialect = ", ".join(profile.dialect_markers[:8]) if profile.dialect_markers else "—"
+    top_topics = sorted(profile.topic_weights.items(), key=lambda x: x[1], reverse=True)[:5]
+    topics_str = "  ".join(f"{name} ({w:.2f})" for name, w in top_topics) if top_topics else "—"
+    fingerprint = "\n".join(f"  • {p}" for p in profile.opinion_fingerprint[:6]) if profile.opinion_fingerprint else "  —"
+
+    rhetorical = "\n".join(f"  • {p}" for p in profile.rhetorical_patterns[:4]) if profile.rhetorical_patterns else "  —"
+
+    console.print(Panel(
+        f"[bold]Persoonlijkheid:[/bold] {escape(profile.persona_summary or '—')}\n\n"
+        f"[bold]Wereldvisie:[/bold] {escape(profile.worldview or '—')}\n\n"
+        f"[bold]Standpunten ({len(profile.opinion_fingerprint)}):[/bold]\n{escape(fingerprint)}\n\n"
+        f"[bold]Retorische patronen:[/bold]\n{escape(rhetorical)}\n\n"
+        f"[bold]Stijl:[/bold] {profile.formality} | zinnen: {profile.sentence_length} | ~{profile.typical_post_length} woorden/post\n"
+        f"[bold]Dialect:[/bold] {escape(dialect)}\n"
+        f"[bold]Actief in:[/bold] {escape(topics_str)}\n"
+        f"[bold]Caps:[/bold] {profile.hourly_cap}/uur  {profile.daily_cap}/dag  "
+        f"| {profile.posts_analyzed} posts geanalyseerd",
+        title=f"Profiel — {escape(profile.original_username)}",
+        border_style="cyan",
+    ))
+
+
 def _rate_samples(console: Console, samples: list[dict]) -> list[dict]:
     rated = []
     for i, sample in enumerate(samples, 1):
         console.print(Panel(
-            f"[bold]{sample['label']}[/bold]\n\n"
-            f"[dim]Post:[/dim] {sample['post']}\n\n"
-            f"[bold cyan]Reply:[/bold cyan] {sample['reply']}",
+            f"[bold]{escape(sample['label'])}[/bold]\n\n"
+            f"[dim]Post:[/dim] {escape(sample['post'])}\n\n"
+            f"[bold cyan]Reply:[/bold cyan]\n{escape(sample['reply'])}",
             title=f"Sample {i}/{len(samples)}",
         ))
         while True:
-            choice = console.input("[i] in-character  [x] off-character  [s] skip: ").strip().lower()
+            choice = console.input(r"\[i] in-character  \[x] off-character  \[s] skip: ").strip().lower()
             if choice in ("i", "x", "s"):
                 break
             console.print("[yellow]Kies i, x of s[/yellow]")
         rated.append({**sample, "rating": choice})
     return rated
+
+
+_INITIAL_BATCHES = 3  # fetched automatically on first visit
+
+
+def _fetch_and_analyze(
+    console: Console,
+    alter: dict,
+    scraper: PostScraper,
+    profile: PersonaProfile,
+) -> None:
+    n_batches = _INITIAL_BATCHES if profile.pages_loaded == 0 else 1
+
+    for batch_i in range(n_batches):
+        is_first = profile.pages_loaded == 0
+        before_ts = profile.oldest_post_ts if profile.oldest_post_ts > 0 else None
+
+        if n_batches > 1:
+            console.print(f"\n[bold]Batch {batch_i + 1}/{n_batches} laden...[/bold]")
+        else:
+            label = "meest recente berichten" if before_ts is None else f"berichten vóór batch {profile.pages_loaded}"
+            console.print(f"\n[bold]Batch laden ({label})...[/bold]")
+
+        try:
+            posts, oldest_ts = scraper.fetch_window(alter["original_username"], before_ts=before_ts)
+        except Exception as exc:
+            console.print(f"[red]Scrape mislukt: {exc}[/red]")
+            return
+
+        if not posts:
+            console.print("[yellow]Geen verdere posts gevonden.[/yellow]")
+            return
+
+        console.print(f"  {len(posts)} posts opgehaald. Analyseren met Gemini...")
+        try:
+            if is_first:
+                new_profile = analyze_first_batch(alter, posts)
+            else:
+                new_profile = refine_with_batch(profile, posts)
+        except ValueError as exc:
+            console.print(f"[red]Analyse mislukt: {exc}[/red]")
+            return
+
+        new_profile.pages_loaded = profile.pages_loaded + 1
+        new_profile.oldest_post_ts = oldest_ts or 0
+        profile.__dict__.update(new_profile.__dict__)
+        _save_profile(profile)
 
 
 def _run_persona_workbench(
@@ -101,81 +172,88 @@ def _run_persona_workbench(
 
     if profile.is_approved:
         console.print("[green]Deze persona is al goedgekeurd.[/green]")
-        choice = console.input("[r] herwerk  [q] terug: ").strip().lower()
+        choice = console.input(r"\[r] herwerk  \[x] reset  \[q] terug: ").strip().lower()
+        if choice == "x":
+            _persona_path(username).unlink(missing_ok=True)
+            console.print(f"[yellow]Profiel gewist. Analyse herstart...[/yellow]")
+            _run_persona_workbench(console, alter, scraper, test_posts)
+            return
         if choice != "r":
             return
         profile.is_approved = False
 
+    # First batch: fetch automatically on first visit
+    if profile.pages_loaded == 0:
+        _fetch_and_analyze(console, alter, scraper, profile)
+        if profile.pages_loaded == 0:
+            return  # scrape or analysis failed
+
+    # Main action loop — user drives from here
     while True:
-        is_first_batch = profile.pages_loaded == 0
+        _show_profile_summary(console, profile)
+        choice = console.input(
+            r"\[l] meer pagina's laden  \[s] voorbeeldreacties  \[a] goedkeuren"
+            r"  \[e] JSON bewerken  \[x] reset  \[q] terug: "
+        ).strip().lower()
 
-        if is_first_batch:
-            # Initial batch: fetch pages 1 and 2 together (200 posts) for richer first analysis
-            console.print(f"\n[bold]Eerste batch laden (pagina 1-2, ~200 posts)...[/bold]")
+        if choice == "l":
+            _fetch_and_analyze(console, alter, scraper, profile)
+        elif choice == "s":
+            console.print("\n[bold]Voorbeeldreacties genereren...[/bold]")
+            samples = generate_replies(profile, test_posts)
+            rated = _rate_samples(console, samples)
+            in_char = sum(1 for r in rated if r["rating"] == "i")
+            console.print(f"\n[bold]Resultaat:[/bold] {in_char}/{len(samples)} in-character")
+        elif choice == "a":
+            profile.is_approved = True
+            _save_profile(profile)
+            console.print(f"[green]✓ {username} goedgekeurd![/green]")
+            return
+        elif choice == "e":
+            path = _persona_path(username)
+            console.print(f"[dim]Bewerk: {path.resolve()}[/dim]")
+            console.input("Druk Enter als klaar...")
             try:
-                posts1, has_more1 = scraper.fetch_batch(alter["user_id"], page=1)
-                posts2, has_more = scraper.fetch_batch(alter["user_id"], page=2) if has_more1 else ([], False)
-            except Exception as exc:
-                console.print(f"[red]Scrape mislukt: {exc}[/red]")
-                return
-            posts = posts1 + posts2
+                profile = PersonaProfile.from_dict(json.loads(path.read_text(encoding="utf-8")))
+            except (json.JSONDecodeError, KeyError) as exc:
+                console.print(f"[red]Ongeldig JSON — profiel niet herladen: {exc}[/red]")
+        elif choice == "x":
+            _persona_path(username).unlink(missing_ok=True)
+            console.print(f"[yellow]Profiel gewist. Analyse herstart...[/yellow]")
+            _run_persona_workbench(console, alter, scraper, test_posts)
+            return
+        elif choice == "q":
+            return
         else:
-            next_page = profile.pages_loaded + 1
-            console.print(f"\n[bold]Volgende batch laden (pagina {next_page}, ~100 posts)...[/bold]")
-            try:
-                posts, has_more = scraper.fetch_batch(alter["user_id"], page=next_page)
-            except Exception as exc:
-                console.print(f"[red]Scrape mislukt: {exc}[/red]")
-                return
+            console.print("[yellow]Ongeldige keuze[/yellow]")
 
-        if not posts:
-            console.print("[yellow]Geen posts gevonden op deze pagina.[/yellow]")
-            break
 
-        console.print(f"  {len(posts)} posts opgehaald. Analyseren met Gemini...")
-        if is_first_batch:
-            profile = analyze_first_batch(alter, posts)
-            profile.pages_loaded = 2  # consumed pages 1 and 2
+def _bulk_analyze(console: Console, alters: list[dict], scraper: PostScraper) -> None:
+    pending = [a for a in alters if _load_profile(a).pages_loaded == 0]
+    if not pending:
+        console.print("[yellow]Geen ongeanalyseerde personas gevonden.[/yellow]")
+        console.input("Enter om door te gaan...")
+        return
+
+    console.print(f"\n[bold]Bulk analyse: {len(pending)} personas te verwerken.[/bold]")
+    console.print("[dim]Druk Ctrl+C om te stoppen.[/dim]\n")
+
+    done = 0
+    failed = 0
+    for alter in pending:
+        profile = _load_profile(alter)
+        username = alter["original_username"]
+        console.rule(f"[bold]{username}[/bold] ({done + failed + 1}/{len(pending)})")
+        _fetch_and_analyze(console, alter, scraper, profile)
+        if profile.pages_loaded > 0:
+            done += 1
+            console.print(f"[green]✓ {username} — {profile.posts_analyzed} posts geanalyseerd[/green]")
         else:
-            profile = refine_with_batch(profile, posts)
-        _save_profile(profile)
-        console.print(f"  Profiel opgeslagen. Totaal geanalyseerd: {profile.posts_analyzed} posts")
+            failed += 1
+            console.print(f"[red]✗ {username} — mislukt[/red]")
 
-        console.print("\n[bold]Voorbeeldreacties genereren...[/bold]")
-        samples = generate_replies(profile, test_posts)
-        rated = _rate_samples(console, samples)
-
-        in_char = sum(1 for r in rated if r["rating"] == "i")
-        console.print(f"\n[bold]Resultaat:[/bold] {in_char}/{len(samples)} in-character")
-
-        if not has_more:
-            console.print("[dim]Geen verdere pagina's beschikbaar.[/dim]")
-
-        while True:
-            options = "[l] volgende batch  [a] goedkeuren  [e] JSON bewerken  [q] terug naar lijst"
-            if not has_more:
-                options = "[a] goedkeuren  [e] JSON bewerken  [q] terug naar lijst"
-            choice = console.input(f"\n{options}: ").strip().lower()
-
-            if choice == "l" and has_more:
-                break
-            elif choice == "a":
-                profile.is_approved = True
-                _save_profile(profile)
-                console.print(f"[green]✓ {username} goedgekeurd![/green]")
-                return
-            elif choice == "e":
-                path = _persona_path(username)
-                console.print(f"[dim]Bewerk: {path.resolve()}[/dim]")
-                console.input("Druk Enter als klaar...")
-                try:
-                    profile = PersonaProfile.from_dict(json.loads(path.read_text(encoding="utf-8")))
-                except (json.JSONDecodeError, KeyError) as exc:
-                    console.print(f"[red]Ongeldig JSON — profiel niet herladen: {exc}[/red]")
-            elif choice == "q":
-                return
-            else:
-                console.print("[yellow]Ongeldige keuze[/yellow]")
+    console.print(f"\n[bold]Klaar: {done} geanalyseerd, {failed} mislukt.[/bold]")
+    console.input("Enter om terug te gaan naar de lijst...")
 
 
 def run_workbench(
@@ -189,9 +267,14 @@ def run_workbench(
         console.clear()
         _show_persona_list(console, alters)
 
-        choice = console.input("\nSelecteer persona [1-25] of q om te stoppen: ").strip().lower()
+        choice = console.input(
+            "\nSelecteer persona (1-25), b voor bulk analyse, of q om te stoppen: "
+        ).strip().lower()
         if choice == "q":
             break
+        if choice == "b":
+            _bulk_analyze(console, alters, scraper)
+            continue
         try:
             idx = int(choice) - 1
             if not (0 <= idx < len(alters)):
