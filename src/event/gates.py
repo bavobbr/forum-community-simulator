@@ -29,8 +29,9 @@ def evaluate_post(
 
     for profile in profiles:
         mentioned = profile.reversed_username.lower() in content.lower()
+        tag_match = any(tag.lower() in content.lower() for tag in profile.interest_tags)
 
-        if not mentioned:
+        if not mentioned and not tag_match:
             weight = profile.topic_weights.get(forum_name, 0.0)
             if weight < _RELEVANCE_THRESHOLD:
                 continue

@@ -70,3 +70,41 @@ def test_pile_on_guard_keeps_max_two(conn):
     post = _make_post()
     result = evaluate_post(post, profiles, conn)
     assert len(result) <= 2
+
+
+def test_tag_match_bypasses_topic_weight(conn):
+    profile = _make_profile(forum_name="Videogames", weight=0.0)
+    profile.interest_tags = ["wielrennen", "Remco Evenepoel"]
+    post = _make_post(forum_name="Zwam", content="De Tour de France was fantastisch, wielrennen op zijn best!")
+    result = evaluate_post(post, [profile], conn)
+    assert profile in result
+
+
+def test_tag_match_is_case_insensitive(conn):
+    profile = _make_profile(forum_name="Videogames", weight=0.0)
+    profile.interest_tags = ["Remco Evenepoel"]
+    post = _make_post(forum_name="Zwam", content="remco evenepoel wint weer!")
+    result = evaluate_post(post, [profile], conn)
+    assert profile in result
+
+
+def test_tag_match_respects_rate_limit(conn):
+    from src.event.db import increment_rate
+    from datetime import datetime, timezone
+    profile = _make_profile(forum_name="Videogames", weight=0.0, hourly_cap=1)
+    profile.interest_tags = ["wielrennen"]
+    post = _make_post(forum_name="Zwam", content="wielrennen is geweldig")
+    now = datetime.now(timezone.utc)
+    hour_key = now.strftime("%Y-%m-%dT%H")
+    day_key = now.strftime("%Y-%m-%d")
+    increment_rate(conn, "ejdar", hour_key, day_key)
+    result = evaluate_post(post, [profile], conn)
+    assert result == []
+
+
+def test_no_tags_still_requires_topic_weight(conn):
+    profile = _make_profile(forum_name="Videogames", weight=0.0)
+    profile.interest_tags = []
+    post = _make_post(forum_name="Zwam", content="wielrennen is geweldig")
+    result = evaluate_post(post, [profile], conn)
+    assert result == []
