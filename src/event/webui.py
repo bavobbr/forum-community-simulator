@@ -1,5 +1,7 @@
 import logging
 import os
+import random
+import time
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, render_template_string
 
@@ -94,15 +96,17 @@ def _do_approve(conn, entry: dict, alter_password: str, live_mode: bool) -> bool
         status = "approved"
 
     db.update_status(conn, entry["id"], status)
-    db.insert_posted(
-        conn, entry["alter_username"], entry["thread_id"],
-        entry["post_id"], entry["reply_text"], simulated=not live_mode,
-    )
 
-    if live_mode and success:
-        now = datetime.now(timezone.utc)
-        db.increment_rate(conn, entry["alter_username"],
-                          now.strftime("%Y-%m-%dT%H"), now.strftime("%Y-%m-%d"))
+    if success:
+        db.insert_posted(
+            conn, entry["alter_username"], entry["thread_id"],
+            entry["post_id"], entry["reply_text"], simulated=not live_mode,
+        )
+        if live_mode:
+            now = datetime.now(timezone.utc)
+            db.increment_rate(conn, entry["alter_username"],
+                              now.strftime("%Y-%m-%dT%H"), now.strftime("%Y-%m-%d"))
+            time.sleep(random.uniform(60, 180))
     return success
 
 
@@ -121,7 +125,7 @@ def create_app(conn, client, profiles, alter_password: str, live_mode: bool) -> 
     @app.route("/reply/<int:reply_id>/approve", methods=["POST"])
     def approve(reply_id):
         entry = db.get_pending_by_id(conn, reply_id)
-        if not entry:
+        if not entry or entry["status"] != "pending":
             return "Not found", 404
         _do_approve(conn, dict(entry), alter_password, live_mode)
         return "", 204
@@ -138,7 +142,7 @@ def create_app(conn, client, profiles, alter_password: str, live_mode: bool) -> 
             return "reply_text required", 400
         db.update_reply_text(conn, reply_id, new_text)
         entry = db.get_pending_by_id(conn, reply_id)
-        if not entry:
+        if not entry or entry["status"] != "pending":
             return "Not found", 404
         _do_approve(conn, dict(entry), alter_password, live_mode)
         return "", 204
