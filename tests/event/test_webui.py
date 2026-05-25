@@ -1,6 +1,5 @@
 import sqlite3
 import pytest
-from unittest.mock import MagicMock
 from src.event.db import init_db, insert_pending
 from src.event.webui import create_app
 from src.persona.models import PersonaProfile
@@ -19,9 +18,8 @@ def _make_profile(reversed_username="ejdar"):
 @pytest.fixture
 def app():
     conn = init_db(":memory:")
-    client = MagicMock()
     profiles = [_make_profile()]
-    flask_app = create_app(conn, client, profiles, "testpass", live_mode=False)
+    flask_app = create_app(conn, profiles, "testpass", live_mode=False)
     flask_app.config["TESTING"] = True
     yield flask_app, conn
     conn.close()

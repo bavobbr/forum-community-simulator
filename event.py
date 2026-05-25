@@ -6,7 +6,6 @@ import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-import anthropic
 from dotenv import load_dotenv
 
 from src.event import db, gates, thread_scraper
@@ -37,7 +36,7 @@ def _is_image_only(content: str) -> bool:
     return not content.replace("[afbeelding]", "").strip()
 
 
-def _poll_once(scanner, profiles, conn, client, alter_password, live_mode, cutoff):
+def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff):
     try:
         new_posts = fetch_new_posts(scanner)
     except Exception as exc:
@@ -71,7 +70,7 @@ def _poll_once(scanner, profiles, conn, client, alter_password, live_mode, cutof
             )
 
             try:
-                reply_text = event_generator.generate_reply(client, profile, triggering, context)
+                reply_text = event_generator.generate_reply(profile, triggering, context)
             except Exception as exc:
                 logging.warning("Generation failed for post %d / %s: %s",
                                 post["post_id"], profile.reversed_username, exc)
@@ -93,7 +92,7 @@ def _poll_once(scanner, profiles, conn, client, alter_password, live_mode, cutof
 
 
 def main():
-    required_vars = ["ANTHROPIC_API_KEY", "FORUM_USERNAME", "FORUM_PASSWORD", "ALTER_PASSWORD"]
+    required_vars = ["GOOGLE_API_KEY", "FORUM_USERNAME", "FORUM_PASSWORD", "ALTER_PASSWORD"]
     missing = [v for v in required_vars if not os.getenv(v)]
     if missing:
         raise SystemExit(f"Missing env vars: {', '.join(missing)}")
@@ -115,9 +114,7 @@ def main():
         raise SystemExit("Scanner login failed")
     logging.info("Scanner logged in")
 
-    client = anthropic.Anthropic()
-
-    app = create_app(conn, client, profiles, alter_password, live_mode)
+    app = create_app(conn, profiles, alter_password, live_mode)
     flask_thread = threading.Thread(
         target=lambda: app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False),
         daemon=True,
@@ -129,7 +126,7 @@ def main():
     logging.info("Processing posts newer than %s (LOOKBACK_HOURS=%d)", cutoff.isoformat(), lookback_hours)
 
     while True:
-        _poll_once(scanner, profiles, conn, client, alter_password, live_mode, cutoff)
+        _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff)
 
         for entry in db.get_pending_auto_approve(conn):
             logging.info("Auto-approving reply %d for %s", entry["id"], entry["alter_username"])

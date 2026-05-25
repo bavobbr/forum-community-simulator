@@ -2,7 +2,6 @@ import json
 import re
 from pathlib import Path
 
-import anthropic
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -89,7 +88,6 @@ def _run_persona_workbench(
     console: Console,
     alter: dict,
     scraper: PostScraper,
-    client: anthropic.Anthropic,
     test_posts: list[dict],
 ) -> None:
     profile = _load_profile(alter)
@@ -134,17 +132,17 @@ def _run_persona_workbench(
             console.print("[yellow]Geen posts gevonden op deze pagina.[/yellow]")
             break
 
-        console.print(f"  {len(posts)} posts opgehaald. Analyseren met Claude...")
+        console.print(f"  {len(posts)} posts opgehaald. Analyseren met Gemini...")
         if is_first_batch:
-            profile = analyze_first_batch(client, alter, posts)
+            profile = analyze_first_batch(alter, posts)
             profile.pages_loaded = 2  # consumed pages 1 and 2
         else:
-            profile = refine_with_batch(client, profile, posts)
+            profile = refine_with_batch(profile, posts)
         _save_profile(profile)
         console.print(f"  Profiel opgeslagen. Totaal geanalyseerd: {profile.posts_analyzed} posts")
 
         console.print("\n[bold]Voorbeeldreacties genereren...[/bold]")
-        samples = generate_replies(client, profile, test_posts)
+        samples = generate_replies(profile, test_posts)
         rated = _rate_samples(console, samples)
 
         in_char = sum(1 for r in rated if r["rating"] == "i")
@@ -183,7 +181,6 @@ def _run_persona_workbench(
 def run_workbench(
     alters: list[dict],
     scraper: PostScraper,
-    client: anthropic.Anthropic,
 ) -> None:
     console = Console()
     test_posts = _load_test_posts()
@@ -204,7 +201,7 @@ def run_workbench(
             console.input("Enter om door te gaan...")
             continue
 
-        _run_persona_workbench(console, alters[idx], scraper, client, test_posts)
+        _run_persona_workbench(console, alters[idx], scraper, test_posts)
         console.input("\nEnter om terug te gaan naar de lijst...")
 
     approved = sum(1 for a in alters if _load_profile(a).is_approved)

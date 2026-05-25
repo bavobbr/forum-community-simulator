@@ -2,7 +2,6 @@ import json
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-import anthropic
 from rich.console import Console
 
 from src.session import VBulletinSession
@@ -16,9 +15,9 @@ _APPROVED_ACCOUNTS = Path("config/approved_accounts.json")
 def main() -> None:
     console = Console()
 
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
-        console.print("[red]ANTHROPIC_API_KEY ontbreekt in .env[/red]")
+        console.print("[red]GOOGLE_API_KEY ontbreekt in .env[/red]")
         return
 
     username = os.getenv("FORUM_USERNAME")
@@ -47,9 +46,8 @@ def main() -> None:
     console.print("[green]Ingelogd.[/green]")
 
     scraper = PostScraper(session, delay=search_delay)
-    client = anthropic.Anthropic(api_key=api_key)
 
-    run_workbench(alters, scraper, client)
+    run_workbench(alters, scraper)
 
 
 if __name__ == "__main__":

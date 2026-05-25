@@ -110,7 +110,7 @@ def _do_approve(conn, entry: dict, alter_password: str, live_mode: bool) -> bool
     return success
 
 
-def create_app(conn, client, profiles, alter_password: str, live_mode: bool) -> Flask:
+def create_app(conn, profiles, alter_password: str, live_mode: bool) -> Flask:
     app = Flask(__name__)
     profile_map = {p.reversed_username: p for p in profiles}
     forum_url = os.getenv("FORUM_URL", "https://forum.shrimprefuge.be")
@@ -163,7 +163,7 @@ def create_app(conn, client, profiles, alter_password: str, live_mode: bool) -> 
                 (p for p in context if p["post_id"] == entry["post_id"]),
                 {"post_id": entry["post_id"], "author": "?", "content": ""},
             )
-            new_text = event_generator.generate_reply(client, profile, triggering, context)
+            new_text = event_generator.generate_reply(profile, triggering, context)
             db.update_reply_text(conn, reply_id, new_text)
         except Exception as exc:
             logging.warning("Regenerate failed for reply %d: %s", reply_id, exc)
