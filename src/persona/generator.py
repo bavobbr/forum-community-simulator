@@ -50,11 +50,12 @@ def generate_replies(profile: PersonaProfile, test_posts: list[dict]) -> list[di
             f"Forum: {test_post['forum']} | Thread: {test_post['thread_title']}\n\n"
             f"Iemand heeft het volgende gepost:\n\n"
             f"\"{test_post['post']}\"\n\n"
-            f"Schrijf een reactie zoals {profile.original_username} dat zou doen. "
-            f"Citeer de post NIET — schrijf alleen je eigen reactie."
+            f"Schrijf één forumreactie zoals {profile.original_username} dat zou doen. "
+            f"Schrijf alleen de reactietekst zelf — geen uitleg, geen opmaak, geen opsomming. "
+            f"Citeer de post NIET."
         )
         try:
-            resp = call_llm_raw(system, user_content, 512, model=MODEL_FLASH)
+            resp = call_llm_raw(system, user_content, 2048, model=MODEL_FLASH)
             reply = resp.text
             if resp.candidates[0].finish_reason.name == "MAX_TOKENS":
                 reply += " [afgekapt]"
