@@ -41,3 +41,40 @@ def test_parse_has_next_page_true_when_multiple_pages():
 def test_parse_has_next_page_false_on_single_page():
     single_page_html = "<html><body><div>Results 1 to 5 of 5</div></body></html>"
     assert parse_has_next_page(single_page_html) is False
+
+
+_QUOTE_POST_HTML = """
+<table id="post999">
+  <tr><td class="thead">
+    <a href="forumdisplay.php?f=9">Zwam</a>
+    09-03-2026, 12:00
+  </td></tr>
+  <tr><td class="alt1">
+    <a href="showthread.php?t=100"><strong>Testthread</strong></a>
+    <div class="alt2"><em>
+      <div class="quote">
+        <div class="thead">Origineel geplaatst door <strong>Bert</strong></div>
+        <div class="alt2">dit is Bert zijn tekst</div>
+      </div>
+      Mijn eigen reactie hier.
+    </em></div>
+  </td></tr>
+</table>
+"""
+
+
+def test_parse_posts_page_strips_quote_divs():
+    posts = parse_posts_page(_QUOTE_POST_HTML)
+    assert len(posts) == 1
+    assert "Bert zijn tekst" not in posts[0]["content"]
+    assert "Mijn eigen reactie hier" in posts[0]["content"]
+
+
+def test_parse_posts_page_extracts_quoted_username():
+    posts = parse_posts_page(_QUOTE_POST_HTML)
+    assert posts[0]["quoted_users"] == ["Bert"]
+
+
+def test_parse_posts_page_no_quoted_users_without_quotes():
+    posts = parse_posts_page(FIXTURE)
+    assert all(p["quoted_users"] == [] for p in posts)

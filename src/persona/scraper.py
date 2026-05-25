@@ -45,6 +45,7 @@ def parse_posts_page(html: str) -> list[dict]:
             thread_id = int(tid_match.group(1)) if tid_match else 0
 
         content = ""
+        quoted_users: list[str] = []
         content_div = alt1.find("div", class_="alt2")
         if content_div:
             em = content_div.find("em")
@@ -52,6 +53,13 @@ def parse_posts_page(html: str) -> list[dict]:
                 post_link = em.find("a")
                 if post_link:
                     post_link.decompose()
+                for quote_div in em.find_all("div", class_="quote"):
+                    thead = quote_div.find("div", class_="thead")
+                    if thead:
+                        name_tag = thead.find("strong")
+                        if name_tag:
+                            quoted_users.append(name_tag.get_text(strip=True))
+                    quote_div.decompose()
                 content = em.get_text(separator=" ", strip=True)
 
         posts.append({
@@ -62,6 +70,7 @@ def parse_posts_page(html: str) -> list[dict]:
             "forum_name": forum_name,
             "date": post_date,
             "content": content,
+            "quoted_users": quoted_users,
         })
 
     return posts

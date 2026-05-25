@@ -30,7 +30,12 @@ _SCHEMA_DESCRIPTION = """{
 def _format_posts(posts: list[dict]) -> str:
     lines = []
     for p in posts:
-        lines.append(f"[{p['date']} | {p['forum_name']} | {p['thread_title']}] {p['content']}")
+        quoted = p.get("quoted_users", [])
+        if quoted:
+            note = f" [bevat citaat van: {', '.join(quoted)}]"
+        else:
+            note = ""
+        lines.append(f"[{p['date']} | {p['forum_name']} | {p['thread_title']}]{note} {p['content']}")
     return "\n".join(lines)
 
 
@@ -72,6 +77,7 @@ def analyze_first_batch(client, alter: dict, posts: list[dict]) -> PersonaProfil
         f"Berichten:\n{posts_text}\n\n"
         f"Geef een JSON object terug met dit schema:\n{_SCHEMA_DESCRIPTION}\n\n"
         f"Kies maximaal 20 representatieve verbatim posts als example_posts. "
+        f"Beperk opinion_fingerprint tot maximaal 15 items. "
         f"Geef enkel het JSON object terug, geen uitleg."
     )
 
@@ -105,6 +111,7 @@ def refine_with_batch(client, profile: PersonaProfile, posts: list[dict]) -> Per
         f"Verfijn het profiel op basis van de nieuwe berichten. "
         f"Geef het volledige bijgewerkte JSON profiel terug met dit schema:\n{_SCHEMA_DESCRIPTION}\n\n"
         f"Vervang example_posts niet volledig — voeg maximaal 5 nieuwe toe als ze representatiever zijn. "
+        f"Behoud bestaande opinion_fingerprint vermeldingen tenzij de nieuwe berichten ze expliciet tegenspreken — voeg nieuwe standpunten toe, maximaal 15 in totaal. "
         f"Geef enkel het JSON object terug, geen uitleg."
     )
 
