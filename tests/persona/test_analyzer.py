@@ -115,3 +115,29 @@ def test_analyze_first_batch_populates_interest_tags():
     with patch("src.persona.analyzer.call_llm", return_value=json.dumps(response)):
         profile = analyze_first_batch(_ALTER, _SAMPLE_POSTS)
     assert profile.interest_tags == ["PlayStation", "Nintendo Switch", "Elden Ring"]
+
+
+def test_refine_merges_new_interest_tags():
+    existing = PersonaProfile.from_alter_ego(_ALTER)
+    existing.posts_analyzed = 100
+    existing.pages_loaded = 1
+    existing.interest_tags = ["PlayStation"]
+    response = dict(_MOCK_REFINE_RESPONSE)
+    response["new_interest_tags"] = ["Nintendo Switch", "PlayStation"]  # PlayStation is a duplicate
+    with patch("src.persona.analyzer.call_llm", return_value=json.dumps(response)):
+        updated = refine_with_batch(existing, _SAMPLE_POSTS)
+    assert "Nintendo Switch" in updated.interest_tags
+    assert updated.interest_tags.count("PlayStation") == 1  # no duplicate
+
+
+def test_refine_includes_existing_tags_in_prompt():
+    existing = PersonaProfile.from_alter_ego(_ALTER)
+    existing.posts_analyzed = 100
+    existing.pages_loaded = 1
+    existing.interest_tags = ["wielrennen", "Remco Evenepoel"]
+    response = dict(_MOCK_REFINE_RESPONSE)
+    response["new_interest_tags"] = []
+    with patch("src.persona.analyzer.call_llm", return_value=json.dumps(response)) as mock_llm:
+        refine_with_batch(existing, _SAMPLE_POSTS)
+    _, user_prompt, _ = mock_llm.call_args[0]
+    assert "wielrennen" in user_prompt

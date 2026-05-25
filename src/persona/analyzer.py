@@ -108,6 +108,7 @@ _REFINE_SCHEMA = """{
   "persona_summary": "Herziene beschrijving als de nieuwe berichten dat rechtvaardigen, anders lege string.",
   "worldview": "Herziene worldview als de nieuwe berichten dat rechtvaardigen, anders lege string.",
   "new_rhetorical_patterns": ["nieuw patroon niet al in het bestaande profiel"],
+  "new_interest_tags": ["nieuwe tags niet al in het bestaande profiel"],
   "typical_post_length": gemiddeld_aantal_woorden_per_bericht_als_int_of_null
 }"""
 
@@ -135,6 +136,9 @@ def _merge_refine(profile: PersonaProfile, data: dict) -> None:
     new_patterns = [p for p in data.get("new_rhetorical_patterns", []) if p not in profile.rhetorical_patterns]
     profile.rhetorical_patterns.extend(new_patterns)
 
+    new_tags = [t for t in data.get("new_interest_tags", []) if t not in profile.interest_tags]
+    profile.interest_tags.extend(new_tags)
+
     new_length = data.get("typical_post_length")
     if new_length:
         profile.typical_post_length = int(new_length)
@@ -150,7 +154,8 @@ def refine_with_batch(profile: PersonaProfile, posts: list[dict]) -> PersonaProf
         + "; ".join(profile.opinion_fingerprint) + "\n"
         f"Huidige topic weights: {profile.topic_weights}\n"
         f"Huidige persona summary: {profile.persona_summary}\n"
-        f"Huidige typical_post_length: {profile.typical_post_length} woorden"
+        f"Huidige typical_post_length: {profile.typical_post_length} woorden\n"
+        f"Huidige interest tags: {', '.join(profile.interest_tags) or '(geen)'}"
     )
 
     prompt = (
