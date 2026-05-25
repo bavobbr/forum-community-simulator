@@ -80,3 +80,25 @@ def test_auto_approve_minutes_round_trips():
     d = p.to_dict()
     p2 = PersonaProfile.from_dict(d)
     assert p2.auto_approve_minutes == 10
+
+
+def test_interest_tags_defaults_to_empty():
+    profile = PersonaProfile.from_alter_ego(_sample_alter())
+    assert profile.interest_tags == []
+
+
+def test_interest_tags_round_trips():
+    profile = PersonaProfile.from_alter_ego(_sample_alter())
+    profile.interest_tags = ["wielrennen", "Remco Evenepoel"]
+    d = profile.to_dict()
+    restored = PersonaProfile.from_dict(d)
+    assert restored.interest_tags == ["wielrennen", "Remco Evenepoel"]
+
+
+def test_from_dict_handles_missing_interest_tags():
+    minimal = {
+        "user_id": 42, "original_username": "foo", "reversed_username": "oof",
+        "post_count": 100, "last_active": "2020-01-01",
+    }
+    profile = PersonaProfile.from_dict(minimal)
+    assert profile.interest_tags == []

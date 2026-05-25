@@ -13,7 +13,8 @@ class PersonaProfile:
 
     # Analysis state
     posts_analyzed: int = 0
-    pages_loaded: int = 0
+    pages_loaded: int = 0          # number of batches fetched
+    oldest_post_ts: int = 0        # Unix timestamp of oldest post seen; next batch loads posts before this
     is_approved: bool = False
 
     # Writing style (LLM-derived)
@@ -33,8 +34,8 @@ class PersonaProfile:
     # Activity pattern
     peak_hours: list[int] = field(default_factory=list)
 
-    # Post length characteristics
-    typical_post_length: str = "medium"  # "short" | "medium" | "long"
+    # Post length characteristics — average word count per post
+    typical_post_length: int = 50
 
     # Rate limits
     daily_cap: int = 10
@@ -43,6 +44,11 @@ class PersonaProfile:
     # Few-shot examples and narrative summary
     example_posts: list[str] = field(default_factory=list)
     persona_summary: str = ""
+
+    # Deep character — used to extrapolate to new topics
+    worldview: str = ""                          # core values, outlook, philosophy
+    rhetorical_patterns: list[str] = field(default_factory=list)  # how they argue and engage
+    interest_tags: list[str] = field(default_factory=list)
 
     # Event orchestrator — None means manual approval only
     auto_approve_minutes: int | None = None
@@ -70,6 +76,7 @@ class PersonaProfile:
             last_active=d["last_active"],
             posts_analyzed=d.get("posts_analyzed", 0),
             pages_loaded=d.get("pages_loaded", 0),
+            oldest_post_ts=d.get("oldest_post_ts", 0),
             is_approved=d.get("is_approved", False),
             dialect_markers=d.get("dialect_markers", []),
             formality=d.get("formality", "casual"),
@@ -80,10 +87,13 @@ class PersonaProfile:
             opinion_fingerprint=d.get("opinion_fingerprint", []),
             frequent_interactions=d.get("frequent_interactions", {}),
             peak_hours=d.get("peak_hours", []),
-            typical_post_length=d.get("typical_post_length", "medium"),
+            typical_post_length=int(d.get("typical_post_length", 50)),
             daily_cap=d.get("daily_cap", 10),
             hourly_cap=d.get("hourly_cap", 3),
             example_posts=d.get("example_posts", []),
             persona_summary=d.get("persona_summary", ""),
+            worldview=d.get("worldview", ""),
+            rhetorical_patterns=d.get("rhetorical_patterns", []),
+            interest_tags=d.get("interest_tags", []),
             auto_approve_minutes=d.get("auto_approve_minutes", None),
         )
