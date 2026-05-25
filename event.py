@@ -36,7 +36,7 @@ def _is_image_only(content: str) -> bool:
     return not content.replace("[afbeelding]", "").strip()
 
 
-def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff):
+def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff, auto_approve_minutes):
     try:
         new_posts = fetch_new_posts(scanner)
     except Exception as exc:
@@ -76,11 +76,9 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff):
                                 post["post_id"], profile.reversed_username, exc)
                 continue
 
-            auto_approve_at = None
-            if profile.auto_approve_minutes is not None:
-                auto_approve_at = (
-                    datetime.now(timezone.utc) + timedelta(minutes=profile.auto_approve_minutes)
-                ).isoformat()
+            auto_approve_at = (
+                datetime.now(timezone.utc) + timedelta(minutes=auto_approve_minutes)
+            ).isoformat()
 
             db.insert_pending(
                 conn, post["post_id"], post["thread_id"], post["forum_id"],
@@ -100,6 +98,7 @@ def main():
     live_mode = os.getenv("LIVE_MODE", "false").lower() == "true"
     lookback_hours = int(os.getenv("LOOKBACK_HOURS", "48"))
     poll_interval = int(os.getenv("POLL_INTERVAL", "300"))
+    auto_approve_minutes = int(os.getenv("AUTO_APPROVE_MINUTES", "10"))
     alter_password = os.getenv("ALTER_PASSWORD")
 
     profiles = _load_profiles("personas")
@@ -126,7 +125,7 @@ def main():
     logging.info("Processing posts newer than %s (LOOKBACK_HOURS=%d)", cutoff.isoformat(), lookback_hours)
 
     while True:
-        _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff)
+        _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff, auto_approve_minutes)
 
         for entry in db.get_pending_auto_approve(conn):
             logging.info("Auto-approving reply %d for %s", entry["id"], entry["alter_username"])
