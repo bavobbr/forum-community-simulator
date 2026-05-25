@@ -2,9 +2,8 @@ import os
 from google import genai
 from google.genai import types
 
-# Initialize client with API key if available; mocked in tests
-_api_key = os.getenv("GOOGLE_API_KEY", "")
-_client = genai.Client(api_key=_api_key) if _api_key else None
+# Initialize client with API key; mocked in tests
+_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY", ""))
 _MODEL = "gemini-3.5-flash"
 
 
