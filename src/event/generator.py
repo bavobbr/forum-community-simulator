@@ -1,12 +1,10 @@
 import logging
+from src.llm import call_llm_raw
 from src.persona.models import PersonaProfile
 from src.persona.generator import build_system_prompt
 
-_MODEL = "claude-sonnet-4-6"
-
 
 def generate_reply(
-    client,
     profile: PersonaProfile,
     triggering_post: dict,
     context_posts: list[dict],
@@ -27,13 +25,8 @@ def generate_reply(
         f"Schrijf een reactie zoals {profile.reversed_username} dat zou doen."
     )
 
-    response = client.messages.create(
-        model=_MODEL,
-        max_tokens=400,
-        system=system,
-        messages=[{"role": "user", "content": user_content}],
-    )
-    reply = response.content[0].text
-    if response.stop_reason == "max_tokens":
+    resp = call_llm_raw(system, user_content, 400)
+    reply = resp.text
+    if resp.candidates[0].finish_reason.name == "MAX_TOKENS":
         reply += " [afgekapt]"
     return reply

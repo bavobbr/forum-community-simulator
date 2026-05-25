@@ -1,4 +1,5 @@
-from unittest.mock import MagicMock
+import pytest
+from unittest.mock import MagicMock, patch
 from src.event.generator import generate_reply
 from src.persona.models import PersonaProfile
 
@@ -21,27 +22,24 @@ _CONTEXT = [
 _TRIGGERING = {"post_id": 12, "author": "Carol", "content": "Is het goed?"}
 
 
-def _make_client(reply_text="Da valt mee"):
-    client = MagicMock()
-    msg = MagicMock()
-    msg.content = [MagicMock(text=reply_text)]
-    msg.stop_reason = "stop"
-    client.messages.create.return_value = msg
-    return client
+def _make_mock_resp(text="Da valt mee", finish_reason="STOP"):
+    resp = MagicMock()
+    resp.text = text
+    resp.candidates[0].finish_reason.name = finish_reason
+    return resp
 
 
 def test_generate_reply_calls_api():
-    client = _make_client()
-    result = generate_reply(client, _make_profile(), _TRIGGERING, _CONTEXT)
+    with patch("src.event.generator.call_llm_raw", return_value=_make_mock_resp()) as mock_raw:
+        result = generate_reply(_make_profile(), _TRIGGERING, _CONTEXT)
     assert result == "Da valt mee"
-    client.messages.create.assert_called_once()
+    mock_raw.assert_called_once()
 
 
 def test_generate_reply_includes_context_in_prompt():
-    client = _make_client()
-    generate_reply(client, _make_profile(), _TRIGGERING, _CONTEXT)
-    call_kwargs = client.messages.create.call_args[1]
-    user_msg = call_kwargs["messages"][0]["content"]
+    with patch("src.event.generator.call_llm_raw", return_value=_make_mock_resp()) as mock_raw:
+        generate_reply(_make_profile(), _TRIGGERING, _CONTEXT)
+    _system, user_msg, _max = mock_raw.call_args[0]
     assert "Alice" in user_msg
     assert "Wie speelt er nog Zelda?" in user_msg
     assert "Carol" in user_msg
@@ -49,26 +47,19 @@ def test_generate_reply_includes_context_in_prompt():
 
 
 def test_generate_reply_prompt_uses_reversed_username():
-    client = _make_client()
-    generate_reply(client, _make_profile(), _TRIGGERING, _CONTEXT)
-    call_kwargs = client.messages.create.call_args[1]
-    user_msg = call_kwargs["messages"][0]["content"]
+    with patch("src.event.generator.call_llm_raw", return_value=_make_mock_resp()) as mock_raw:
+        generate_reply(_make_profile(), _TRIGGERING, _CONTEXT)
+    _system, user_msg, _max = mock_raw.call_args[0]
     assert "ejdar" in user_msg
 
 
 def test_generate_reply_appends_afgekapt_on_max_tokens():
-    client = MagicMock()
-    msg = MagicMock()
-    msg.content = [MagicMock(text="Lang antwoord")]
-    msg.stop_reason = "max_tokens"
-    client.messages.create.return_value = msg
-    result = generate_reply(client, _make_profile(), _TRIGGERING, _CONTEXT)
+    with patch("src.event.generator.call_llm_raw", return_value=_make_mock_resp("Lang antwoord", "MAX_TOKENS")):
+        result = generate_reply(_make_profile(), _TRIGGERING, _CONTEXT)
     assert result == "Lang antwoord [afgekapt]"
 
 
 def test_generate_reply_raises_on_api_error():
-    client = MagicMock()
-    client.messages.create.side_effect = RuntimeError("API down")
-    import pytest
-    with pytest.raises(RuntimeError):
-        generate_reply(client, _make_profile(), _TRIGGERING, _CONTEXT)
+    with patch("src.event.generator.call_llm_raw", side_effect=RuntimeError("API down")):
+        with pytest.raises(RuntimeError):
+            generate_reply(_make_profile(), _TRIGGERING, _CONTEXT)
