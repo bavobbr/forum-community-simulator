@@ -1,5 +1,5 @@
 import logging
-from src.llm import call_llm_raw
+from src.llm import call_llm_raw, MODEL_PRO
 from src.persona.models import PersonaProfile
 
 
@@ -40,7 +40,7 @@ def generate_replies(profile: PersonaProfile, test_posts: list[dict]) -> list[di
             f"Schrijf een reactie zoals {profile.original_username} dat zou doen."
         )
         try:
-            resp = call_llm_raw(system, user_content, 400)
+            resp = call_llm_raw(system, user_content, 400, model=MODEL_PRO)
             reply = resp.text
             if resp.candidates[0].finish_reason.name == "MAX_TOKENS":
                 reply += " [afgekapt]"
