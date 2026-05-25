@@ -1,4 +1,5 @@
 import json
+import pytest
 from unittest.mock import patch
 from src.persona.models import PersonaProfile
 from src.persona.analyzer import analyze_first_batch, refine_with_batch
@@ -34,7 +35,7 @@ _MOCK_ANALYSIS_RESPONSE = {
     "opinion_fingerprint": ["sceptisch over hype", "direct in taal"],
     "frequent_interactions": {},
     "peak_hours": [18, 19, 20],
-    "typical_post_length": "short",
+    "typical_post_length": 30,
     "daily_cap": 5,
     "hourly_cap": 2,
     "example_posts": [
@@ -42,6 +43,16 @@ _MOCK_ANALYSIS_RESPONSE = {
         "ge zijt echt ne zever man, da klopt van geen kanten",
     ],
     "persona_summary": "Direct en nuchter gamer uit Vlaanderen. Schrijft in dialect, kort en bondig.",
+}
+
+_MOCK_REFINE_RESPONSE = {
+    "new_dialect_markers": ["da", "wss", "zever"],
+    "new_opinion_fingerprint": ["vindt hype altijd overdreven"],
+    "topic_weights_update": {"Videogames": 0.9},
+    "new_example_posts": [],
+    "frequent_interactions_update": {},
+    "persona_summary": "",
+    "typical_post_length": None,
 }
 
 _ALTER = {
@@ -81,17 +92,26 @@ def test_refine_with_batch_updates_existing_profile():
     existing.posts_analyzed = 100
     existing.pages_loaded = 1
     existing.dialect_markers = ["ge", "ni"]
-    updated_response = dict(_MOCK_ANALYSIS_RESPONSE)
-    updated_response["dialect_markers"] = ["ge", "ni", "da", "wss", "zever"]
-    with patch("src.persona.analyzer.call_llm", return_value=json.dumps(updated_response)):
+    existing.opinion_fingerprint = ["sceptisch over hype"]
+    with patch("src.persona.analyzer.call_llm", return_value=json.dumps(_MOCK_REFINE_RESPONSE)):
         updated = refine_with_batch(existing, _SAMPLE_POSTS)
     assert updated.posts_analyzed == 102
     assert updated.pages_loaded == 2
     assert "da" in updated.dialect_markers
+    assert "ge" in updated.dialect_markers  # existing preserved
+    assert "vindt hype altijd overdreven" in updated.opinion_fingerprint
+    assert "sceptisch over hype" in updated.opinion_fingerprint  # existing preserved
 
 
-def test_analyze_handles_malformed_json_gracefully():
+def test_analyze_raises_on_malformed_json():
     with patch("src.persona.analyzer.call_llm", return_value="this is not json {{{"):
+        with pytest.raises(ValueError, match="JSON"):
+            analyze_first_batch(_ALTER, _SAMPLE_POSTS)
+
+
+def test_analyze_first_batch_populates_interest_tags():
+    response = dict(_MOCK_ANALYSIS_RESPONSE)
+    response["interest_tags"] = ["PlayStation", "Nintendo Switch", "Elden Ring"]
+    with patch("src.persona.analyzer.call_llm", return_value=json.dumps(response)):
         profile = analyze_first_batch(_ALTER, _SAMPLE_POSTS)
-    assert profile.user_id == 119
-    assert profile.posts_analyzed == 0
+    assert profile.interest_tags == ["PlayStation", "Nintendo Switch", "Elden Ring"]
