@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
+load_dotenv()
 
 from src.event import db, gates, thread_scraper
 from src.event import generator as event_generator
@@ -16,7 +17,6 @@ from src.persona.models import PersonaProfile
 from src.session import VBulletinSession
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-load_dotenv()
 
 
 def _load_profiles(personas_dir: str) -> list[PersonaProfile]:

@@ -2,13 +2,13 @@ import json
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+load_dotenv()
+
 from rich.console import Console
 
 from src.session import VBulletinSession
 from src.persona.scraper import PostScraper
 from src.workbench.cli import run_workbench
-
-load_dotenv()
 
 _APPROVED_ACCOUNTS = Path("config/approved_accounts.json")
 
