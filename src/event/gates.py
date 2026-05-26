@@ -10,12 +10,28 @@ _RELEVANCE_THRESHOLD = 0.2
 _MAX_RESPONDERS = 2
 
 
+def detect_quoted_alters(post: dict, profiles: list[PersonaProfile]) -> set[str]:
+    all_reversed = {p.reversed_username for p in profiles}
+    if post.get("author", "") in all_reversed:
+        return set()
+    content = post.get("content", "").lower()
+    quoted = set()
+    for profile in profiles:
+        marker = f"originally posted by {profile.reversed_username.lower()}"
+        if marker in content:
+            quoted.add(profile.reversed_username)
+    return quoted
+
+
 def evaluate_post(
     post: dict,
     profiles: list[PersonaProfile],
     conn,
-) -> list[PersonaProfile]:
-    """Return up to 2 profiles that should respond to this post."""
+) -> list[tuple[PersonaProfile, float]]:
+    """Return up to 2 (profile, weight) pairs that should respond to this post.
+
+    Weight reflects relevance — callers can use it for cross-post prioritisation.
+    """
     if post["forum_id"] in _EXCLUDED_FORUM_IDS:
         return []
 
@@ -49,4 +65,4 @@ def evaluate_post(
         passed.append((profile, weight))
 
     passed.sort(key=lambda x: x[1], reverse=True)
-    return [p for p, _ in passed[:_MAX_RESPONDERS]]
+    return passed[:_MAX_RESPONDERS]

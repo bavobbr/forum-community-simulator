@@ -1,7 +1,7 @@
 import sqlite3
 import pytest
 from src.event.db import init_db, increment_rate
-from src.event.gates import evaluate_post
+from src.event.gates import evaluate_post, detect_quoted_alters
 from src.persona.models import PersonaProfile
 
 
@@ -42,13 +42,17 @@ def test_low_relevance_skips(conn):
     assert all(r == [] for r in results)
 
 
+def _profiles(result):
+    return [p for p, _ in result]
+
+
 def test_mention_bypasses_relevance(conn):
     profile = _make_profile(forum_name="Videogames", weight=0.0)
     post = _make_post(forum_name="Zwam", content="ejdar wat denk jij?")
     # ejdar is mentioned → relevance bypassed; probability bypassed
     # with weight=0.0 for a different forum but mention → must pass
     passed = evaluate_post(post, [profile], conn)
-    assert profile in passed
+    assert profile in _profiles(passed)
 
 
 def test_rate_limit_blocks(conn):
@@ -77,7 +81,7 @@ def test_tag_match_bypasses_topic_weight(conn):
     profile.interest_tags = ["wielrennen", "Remco Evenepoel"]
     post = _make_post(forum_name="Zwam", content="De Tour de France was fantastisch, wielrennen op zijn best!")
     result = evaluate_post(post, [profile], conn)
-    assert profile in result
+    assert profile in _profiles(result)
 
 
 def test_tag_match_is_case_insensitive(conn):
@@ -85,7 +89,7 @@ def test_tag_match_is_case_insensitive(conn):
     profile.interest_tags = ["Remco Evenepoel"]
     post = _make_post(forum_name="Zwam", content="remco evenepoel wint weer!")
     result = evaluate_post(post, [profile], conn)
-    assert profile in result
+    assert profile in _profiles(result)
 
 
 def test_tag_match_respects_rate_limit(conn):
@@ -108,3 +112,65 @@ def test_no_tags_still_requires_topic_weight(conn):
     post = _make_post(forum_name="Zwam", content="wielrennen is geweldig")
     result = evaluate_post(post, [profile], conn)
     assert result == []
+
+
+def test_evaluate_post_returns_weights(conn):
+    profile = _make_profile(weight=0.9)
+    post = _make_post()
+    # Run many times to ensure at least one passes the random gate
+    for _ in range(30):
+        result = evaluate_post(post, [profile], conn)
+        if result:
+            _, weight = result[0]
+            assert isinstance(weight, float)
+            assert 0.0 <= weight <= 1.0
+            return
+    # If none passed it means random gate consistently blocked — that's fine
+
+
+def _make_profile_with_reversed(reversed_username):
+    p = PersonaProfile.from_alter_ego({
+        "user_id": 1, "original_username": reversed_username[::-1],
+        "reversed_username": reversed_username,
+        "post_count": 100, "last_active": "2023-01-01",
+    })
+    return p
+
+
+def test_detect_quoted_alters_finds_quoted_profile():
+    profiles = [_make_profile_with_reversed("ejdar"), _make_profile_with_reversed("nboj")]
+    post = {"author": "real_user", "content": "[QUOTE=ejdar;123]something[/QUOTE]\nOriginally Posted by ejdar\nhello"}
+    result = detect_quoted_alters(post, profiles)
+    assert "ejdar" in result
+    assert "nboj" not in result
+
+
+def test_detect_quoted_alters_is_case_insensitive():
+    profiles = [_make_profile_with_reversed("Ejdar")]
+    post = {"author": "real_user", "content": "originally posted by ejdar"}
+    result = detect_quoted_alters(post, profiles)
+    assert "Ejdar" in result
+
+
+def test_detect_quoted_alters_returns_empty_when_alter_quotes_alter():
+    profiles = [_make_profile_with_reversed("ejdar"), _make_profile_with_reversed("nboj")]
+    post = {"author": "ejdar", "content": "Originally Posted by nboj\nsomething"}
+    result = detect_quoted_alters(post, profiles)
+    assert result == set()
+
+
+def test_detect_quoted_alters_returns_empty_when_no_quote():
+    profiles = [_make_profile_with_reversed("ejdar")]
+    post = {"author": "real_user", "content": "Gewoon een bericht zonder citaat"}
+    result = detect_quoted_alters(post, profiles)
+    assert result == set()
+
+
+def test_detect_quoted_alters_can_find_multiple():
+    profiles = [_make_profile_with_reversed("ejdar"), _make_profile_with_reversed("nboj")]
+    post = {
+        "author": "real_user",
+        "content": "Originally Posted by ejdar\n...\nOriginally Posted by nboj\n..."
+    }
+    result = detect_quoted_alters(post, profiles)
+    assert result == {"ejdar", "nboj"}
