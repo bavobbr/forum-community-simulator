@@ -169,3 +169,18 @@ def get_daily_posts_summary(conn: sqlite3.Connection, day_key: str) -> dict[str,
         (f"{day_key}%",),
     ).fetchall()
     return {r["alter_username"]: r["cnt"] for r in rows}
+
+
+def get_all_rate_stats(conn: sqlite3.Connection, hour_key: str, cutoff_hour_key: str) -> dict[str, dict]:
+    hourly_rows = conn.execute(
+        "SELECT alter_username, hourly_count FROM rate_counters WHERE hour_key=?",
+        (hour_key,),
+    ).fetchall()
+    daily_rows = conn.execute(
+        "SELECT alter_username, SUM(hourly_count) AS total FROM rate_counters WHERE hour_key >= ? GROUP BY alter_username",
+        (cutoff_hour_key,),
+    ).fetchall()
+    hourly = {r["alter_username"]: r["hourly_count"] for r in hourly_rows}
+    daily = {r["alter_username"]: r["total"] for r in daily_rows}
+    all_names = set(hourly) | set(daily)
+    return {name: {"hourly": hourly.get(name, 0), "daily": daily.get(name, 0)} for name in all_names}

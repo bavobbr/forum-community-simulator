@@ -3,6 +3,7 @@ import pytest
 from src.event.db import (
     init_db, mark_seen, is_seen,
     get_hourly_count, get_daily_count, increment_rate,
+    get_all_rate_stats,
     insert_pending, get_pending, get_pending_by_id,
     update_status, update_reply_text,
     insert_posted, get_pending_auto_approve,
@@ -79,3 +80,25 @@ def test_insert_posted_and_summary(conn):
     insert_posted(conn, "ejdar", 101, 2, "reply2", simulated=True)
     summary = get_daily_posts_summary(conn, today)
     assert summary.get("ejdar", 0) == 2
+
+
+def test_get_all_rate_stats_basic(conn):
+    increment_rate(conn, "ejdar", "2026-05-25T14", "2026-05-25")
+    increment_rate(conn, "ejdar", "2026-05-25T14", "2026-05-25")
+    increment_rate(conn, "ejdar", "2026-05-25T13", "2026-05-25")
+    stats = get_all_rate_stats(conn, "2026-05-25T14", "2026-05-25T00")
+    assert stats["ejdar"]["hourly"] == 2
+    assert stats["ejdar"]["daily"] == 3
+
+
+def test_get_all_rate_stats_excludes_old(conn):
+    increment_rate(conn, "ejdar", "2026-05-25T10", "2026-05-25")
+    increment_rate(conn, "ejdar", "2026-05-25T14", "2026-05-25")
+    stats = get_all_rate_stats(conn, "2026-05-25T14", "2026-05-25T12")
+    assert stats["ejdar"]["hourly"] == 1
+    assert stats["ejdar"]["daily"] == 1
+
+
+def test_get_all_rate_stats_empty(conn):
+    stats = get_all_rate_stats(conn, "2026-05-25T14", "2026-05-25T00")
+    assert stats == {}
