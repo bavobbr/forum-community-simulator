@@ -320,6 +320,7 @@ This two-stage approach prevents startup bursts (a full day's backlog triggering
 ### Flow diagram
 
 ```mermaid
+%%{init: {"themeVariables": {"fontSize": "11px"}}}%%
 flowchart TD
     RATE{hourly count\n>= hourly_cap?}
 
