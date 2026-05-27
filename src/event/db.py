@@ -70,10 +70,10 @@ def get_hourly_count(conn: sqlite3.Connection, alter_username: str, hour_key: st
     return row["hourly_count"] if row else 0
 
 
-def get_daily_count(conn: sqlite3.Connection, alter_username: str, day_key: str) -> int:
+def get_daily_count(conn: sqlite3.Connection, alter_username: str, cutoff_hour_key: str) -> int:
     row = conn.execute(
-        "SELECT SUM(hourly_count) AS total FROM rate_counters WHERE alter_username=? AND day_key=?",
-        (alter_username, day_key),
+        "SELECT SUM(hourly_count) AS total FROM rate_counters WHERE alter_username=? AND hour_key >= ?",
+        (alter_username, cutoff_hour_key),
     ).fetchone()
     return row["total"] or 0
 

@@ -25,19 +25,26 @@ def test_seen_posts_roundtrip(conn):
 
 def test_rate_counters(conn):
     assert get_hourly_count(conn, "ejdar", "2026-05-25T14") == 0
-    assert get_daily_count(conn, "ejdar", "2026-05-25") == 0
+    assert get_daily_count(conn, "ejdar", "2026-05-25T00") == 0
     increment_rate(conn, "ejdar", "2026-05-25T14", "2026-05-25")
     increment_rate(conn, "ejdar", "2026-05-25T14", "2026-05-25")
     assert get_hourly_count(conn, "ejdar", "2026-05-25T14") == 2
-    assert get_daily_count(conn, "ejdar", "2026-05-25") == 2
+    assert get_daily_count(conn, "ejdar", "2026-05-25T00") == 2
 
 
 def test_daily_count_spans_hours(conn):
     increment_rate(conn, "ejdar", "2026-05-25T13", "2026-05-25")
     increment_rate(conn, "ejdar", "2026-05-25T14", "2026-05-25")
-    assert get_daily_count(conn, "ejdar", "2026-05-25") == 2
+    assert get_daily_count(conn, "ejdar", "2026-05-25T00") == 2
     assert get_hourly_count(conn, "ejdar", "2026-05-25T13") == 1
     assert get_hourly_count(conn, "ejdar", "2026-05-25T14") == 1
+
+
+def test_daily_count_excludes_old_hours(conn):
+    increment_rate(conn, "ejdar", "2026-05-25T10", "2026-05-25")
+    increment_rate(conn, "ejdar", "2026-05-25T14", "2026-05-25")
+    # cutoff at T12 → T10 excluded, T14 included
+    assert get_daily_count(conn, "ejdar", "2026-05-25T12") == 1
 
 
 def test_pending_replies_crud(conn):
