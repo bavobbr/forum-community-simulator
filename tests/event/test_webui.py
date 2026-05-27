@@ -57,6 +57,22 @@ def test_edit_updates_reply_text(app):
     assert row["reply_text"] == "aangepast"
 
 
+def test_approve_discards_when_rate_cap_reached(app):
+    from datetime import datetime, timezone
+    from src.event.db import increment_rate, get_pending_by_id
+    flask_app, conn = app
+    now = datetime.now(timezone.utc)
+    hour_key = now.strftime("%Y-%m-%dT%H")
+    day_key = now.strftime("%Y-%m-%d")
+    # Fill hourly cap (default 3) for ejdar
+    for _ in range(3):
+        increment_rate(conn, "ejdar", hour_key, day_key)
+    reply_id = insert_pending(conn, 1, 100, 9, "ejdar", "reply")
+    with flask_app.test_client() as c:
+        c.post(f"/reply/{reply_id}/approve")
+    assert get_pending_by_id(conn, reply_id)["status"] == "discarded"
+
+
 def test_status_endpoint(app):
     flask_app, conn = app
     with flask_app.test_client() as c:

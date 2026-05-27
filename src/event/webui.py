@@ -135,7 +135,20 @@ _STATS_TEMPLATE = """<!DOCTYPE html>
 </html>"""
 
 
-def _do_approve(conn, entry: dict, alter_password: str, live_mode: bool) -> bool:
+def _do_approve(conn, entry: dict, alter_password: str, live_mode: bool, profile_map: dict = None) -> bool:
+    if profile_map:
+        profile = profile_map.get(entry["alter_username"])
+        if profile:
+            now_check = datetime.now(timezone.utc)
+            hour_key = now_check.strftime("%Y-%m-%dT%H")
+            cutoff = (now_check - timedelta(hours=24)).strftime("%Y-%m-%dT%H")
+            hourly = db.get_hourly_count(conn, entry["alter_username"], hour_key)
+            daily = db.get_daily_count(conn, entry["alter_username"], cutoff)
+            if hourly >= profile.hourly_cap or daily >= profile.daily_cap:
+                logging.info("Rate cap reached for %s at approval time, discarding", entry["alter_username"])
+                db.update_status(conn, entry["id"], "discarded")
+                return False
+
     if live_mode:
         success = poster.post_reply(
             entry["alter_username"], alter_password,
@@ -209,7 +222,7 @@ def create_app(conn, profiles, alter_password: str, live_mode: bool) -> Flask:
         entry = db.get_pending_by_id(conn, reply_id)
         if not entry or entry["status"] != "pending":
             return "Not found", 404
-        _do_approve(conn, dict(entry), alter_password, live_mode)
+        _do_approve(conn, dict(entry), alter_password, live_mode, profile_map)
         return redirect("/")
 
     @app.route("/reply/<int:reply_id>/discard", methods=["POST"])
@@ -226,7 +239,7 @@ def create_app(conn, profiles, alter_password: str, live_mode: bool) -> Flask:
         entry = db.get_pending_by_id(conn, reply_id)
         if not entry or entry["status"] != "pending":
             return redirect("/")
-        _do_approve(conn, dict(entry), alter_password, live_mode)
+        _do_approve(conn, dict(entry), alter_password, live_mode, profile_map)
         return redirect("/")
 
     @app.route("/reply/<int:reply_id>/regenerate", methods=["POST"])

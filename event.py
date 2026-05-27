@@ -171,13 +171,15 @@ def main():
     cutoff = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
     logging.info("Processing posts newer than %s (LOOKBACK_HOURS=%d)", cutoff.isoformat(), lookback_hours)
 
+    profile_map = {p.reversed_username: p for p in profiles}
+
     while True:
         _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
                    auto_approve_minutes, replies_per_cycle)
 
         for entry in db.get_pending_auto_approve(conn):
             logging.info("Auto-approving reply %d for %s", entry["id"], entry["alter_username"])
-            _do_approve(conn, dict(entry), alter_password, live_mode)
+            _do_approve(conn, dict(entry), alter_password, live_mode, profile_map)
 
         time.sleep(poll_interval)
 
