@@ -16,6 +16,7 @@ _QUEUE_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <title>Shrimp Resurrect — Review Queue</title>
+<meta http-equiv="refresh" content="30">
 <style>
   body { font-family: monospace; max-width: 900px; margin: 40px auto; padding: 0 20px; background: #1a1a1a; color: #ccc; }
   h1 { color: #fff; }
@@ -31,6 +32,12 @@ _QUEUE_TEMPLATE = """<!DOCTYPE html>
   textarea { width: 100%; height: 80px; background: #333; color: #ccc; border: 1px solid #555; padding: 6px; }
   .edit-area { display: none; margin-top: 8px; }
   .empty { color: #888; padding: 20px; text-align: center; }
+  .persona-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; align-items: center; }
+  .pill { padding: 3px 10px; border-radius: 12px; font-size: 0.85em; border: 1px solid #555; }
+  .pill-ok     { border-color: #4caf50; color: #4caf50; }
+  .pill-hourly { border-color: #ff9800; color: #ff9800; }
+  .pill-daily  { border-color: #f44336; color: #f44336; }
+  .bar-link { margin-left: auto; color: #888; font-size: 0.85em; }
 </style>
 </head>
 <body>
@@ -39,6 +46,14 @@ _QUEUE_TEMPLATE = """<!DOCTYPE html>
     {% if live_mode %}LIVE{% else %}SIMULATIE{% endif %}
   </span>
 </h1>
+<div class="persona-bar" id="persona-bar">
+  {% for r in persona_stats %}
+  <span class="pill pill-{{ r.status }}" title="{{ r.daily_used }}/{{ r.daily_cap }} today">
+    {{ r.name }} {{ r.hourly_used }}/{{ r.hourly_cap }} &middot; {{ r.daily_used }}/{{ r.daily_cap }}
+  </span>
+  {% endfor %}
+  <a class="bar-link" href="/stats">→ stats</a>
+</div>
 <p><a href="/status" style="color:#888">status JSON</a></p>
 {% if not replies %}
   <p class="empty">Geen wachtende reacties.</p>
@@ -179,8 +194,14 @@ def create_app(conn, profiles, alter_password: str, live_mode: bool) -> Flask:
     @app.route("/")
     def index():
         pending = [dict(r) for r in db.get_pending(conn)]
+        now = datetime.now(timezone.utc)
+        hour_key = now.strftime("%Y-%m-%dT%H")
+        cutoff_hour_key = (now - timedelta(hours=24)).strftime("%Y-%m-%dT%H")
+        rate_stats = db.get_all_rate_stats(conn, hour_key, cutoff_hour_key)
+        persona_stats = _build_persona_stats(profiles, rate_stats)
         return render_template_string(
-            _QUEUE_TEMPLATE, replies=pending, live_mode=live_mode, forum_url=forum_url
+            _QUEUE_TEMPLATE, replies=pending, live_mode=live_mode,
+            forum_url=forum_url, persona_stats=persona_stats
         )
 
     @app.route("/reply/<int:reply_id>/approve", methods=["POST"])
