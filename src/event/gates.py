@@ -1,6 +1,6 @@
 import random
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from src.persona.models import PersonaProfile
 from src.event import db
@@ -37,7 +37,7 @@ def evaluate_post(
 
     now = datetime.now(timezone.utc)
     hour_key = now.strftime("%Y-%m-%dT%H")
-    day_key = now.strftime("%Y-%m-%d")
+    cutoff_hour_key = (now - timedelta(hours=24)).strftime("%Y-%m-%dT%H")
     forum_name = post.get("forum_name", "")
     content = post.get("content", "")
 
@@ -60,7 +60,7 @@ def evaluate_post(
                 weight = profile.topic_weights.get(forum_name, 1.0)
 
         hourly = db.get_hourly_count(conn, profile.reversed_username, hour_key)
-        daily = db.get_daily_count(conn, profile.reversed_username, day_key)
+        daily = db.get_daily_count(conn, profile.reversed_username, cutoff_hour_key)
         if hourly >= profile.hourly_cap or daily >= profile.daily_cap:
             logging.debug("Rate limit hit for %s", profile.reversed_username)
             continue
