@@ -314,6 +314,8 @@ This two-stage approach prevents startup bursts (a full day's backlog triggering
 
 ```mermaid
 flowchart TD
+    RATE{hourly count\n>= hourly_cap?}
+
     A([New post]) --> B{Author is\nan alter ego?}
     B -- yes --> SKIP1([Skip])
     B -- no --> C{Excluded\nforum?}
@@ -334,7 +336,6 @@ flowchart TD
     H -- no --> W4[weight = topic_weight]
     W4 --> RATE
 
-    RATE{hourly count\n>= hourly_cap?}
     RATE -- yes --> SKIP5([Skip - rate cap])
     RATE -- no --> RATE2{rolling 24h count\n>= daily_cap?}
     RATE2 -- yes --> SKIP6([Skip - daily cap])
