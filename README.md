@@ -329,21 +329,21 @@ flowchart TD
     W3 --> RATE
     F -- no --> G{topic_weight\n< 0.20?}
     G -- yes --> SKIP3([Skip])
-    G -- no --> H{random ≥\ntopic_weight?}
+    G -- no --> H{random >= \ntopic_weight?}
     H -- yes --> SKIP4([Skip])
     H -- no --> W4[weight = topic_weight]
     W4 --> RATE
 
-    RATE{hourly count\n≥ hourly_cap?}
-    RATE -- yes --> SKIP5([Skip — rate cap])
-    RATE -- no --> RATE2{rolling 24h count\n≥ daily_cap?}
-    RATE2 -- yes --> SKIP6([Skip — daily cap])
+    RATE{hourly count\n>= hourly_cap?}
+    RATE -- yes --> SKIP5([Skip - rate cap])
+    RATE -- no --> RATE2{rolling 24h count\n>= daily_cap?}
+    RATE2 -- yes --> SKIP6([Skip - daily cap])
     RATE2 -- no --> POOL[Add to candidate pool\nmax 2 per post]
 
-    POOL --> CYCLE
+    POOL --> S1
 
     subgraph CYCLE[Cycle selection]
-        S1[Sort all candidates\nby weight ↓] --> S2
+        S1[Sort all candidates\nby weight desc] --> S2
         S2{alter + thread\nalready selected?} -- yes --> S3([Skip])
         S2 -- no --> S4[Select candidate]
         S4 --> S5{REPLIES_PER_CYCLE\nreached?}
