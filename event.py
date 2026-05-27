@@ -45,7 +45,7 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
         return
 
     # Phase 1: evaluate all unseen posts, collect (post, profile, weight) candidates
-    candidates: list[tuple[dict, object, float]] = []
+    candidates: list[tuple[dict, PersonaProfile, float]] = []
     evaluated_posts: list[dict] = []
 
     for post in new_posts:
