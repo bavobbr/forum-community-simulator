@@ -32,6 +32,10 @@ def evaluate_post(
 
     Weight reflects relevance — callers can use it for cross-post prioritisation.
     """
+    all_reversed = {p.reversed_username for p in profiles}
+    if post.get("author", "") in all_reversed:
+        return []
+
     if post["forum_id"] in _EXCLUDED_FORUM_IDS:
         return []
 

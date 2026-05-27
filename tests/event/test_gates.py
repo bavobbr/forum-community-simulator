@@ -206,3 +206,12 @@ def test_non_quoted_alter_uses_normal_logic(conn):
     post["quoted_alters"] = set()
     result = evaluate_post(post, [profile], conn)
     assert result == []
+
+
+def test_alter_authored_post_is_skipped(conn):
+    profile_a = _make_profile(reversed_username="ejdar", weight=1.0)
+    profile_b = _make_profile(reversed_username="trams", weight=1.0)
+    post = _make_post(content="Hallo allemaal")
+    post["author"] = "ejdar"  # authored by an alter ego
+    result = evaluate_post(post, [profile_a, profile_b], conn)
+    assert result == []
