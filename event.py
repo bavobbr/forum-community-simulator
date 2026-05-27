@@ -36,12 +36,17 @@ def _is_image_only(content: str) -> bool:
     return not content.replace("[afbeelding]", "").strip()
 
 
-def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff, auto_approve_minutes):
+def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
+               auto_approve_minutes, replies_per_cycle):
     try:
         new_posts = fetch_new_posts(scanner)
     except Exception as exc:
         logging.error("Poll failed: %s", exc)
         return
+
+    # Phase 1: evaluate all unseen posts, collect (post, profile, weight) candidates
+    candidates: list[tuple[dict, object, float]] = []
+    evaluated_posts: list[dict] = []
 
     for post in new_posts:
         if db.is_seen(conn, post["post_id"]):
@@ -52,12 +57,41 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff, auto_
             db.mark_seen(conn, post["post_id"], post["thread_id"], post["forum_id"])
             continue
 
-        respondents = gates.evaluate_post(post, profiles, conn)
+        evaluated_posts.append(post)
 
-        for profile in respondents:
-            if _is_image_only(post.get("content", "")):
+        if _is_image_only(post.get("content", "")):
+            continue
+
+        post["quoted_alters"] = gates.detect_quoted_alters(post, profiles)
+        for profile, weight in gates.evaluate_post(post, profiles, conn):
+            candidates.append((post, profile, weight))
+
+    # Phase 2: pick the top N most relevant candidates for this cycle
+    candidates.sort(key=lambda x: x[2], reverse=True)
+    selected = candidates[:replies_per_cycle]
+    logging.info(
+        "Cycle: %d new posts, %d candidates, %d selected (cap=%d)",
+        len(evaluated_posts), len(candidates), len(selected), replies_per_cycle,
+    )
+
+    # Phase 3: generate and queue replies for selected candidates only
+    for post, profile, _ in selected:
+        is_quote_reply = profile.reversed_username in post.get("quoted_alters", set())
+
+        if is_quote_reply:
+            try:
+                llm_reply = event_generator.generate_quote_reply(profile, post)
+            except Exception as exc:
+                logging.warning("Quote-reply generation failed for post %d / %s: %s",
+                                post["post_id"], profile.reversed_username, exc)
                 continue
-
+            quote_block = (
+                f"[QUOTE={post['author']};{post['post_id']}]"
+                f"{post.get('content', '')}"
+                f"[/QUOTE]\n"
+            )
+            reply_text = quote_block + llm_reply
+        else:
             try:
                 context = thread_scraper.fetch_thread_context(scanner, post["post_id"])
             except Exception as exc:
@@ -76,21 +110,23 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff, auto_
                                 post["post_id"], profile.reversed_username, exc)
                 continue
 
-            auto_approve_at = (
-                datetime.now(timezone.utc) + timedelta(minutes=auto_approve_minutes)
-            ).isoformat()
+        auto_approve_at = (
+            datetime.now(timezone.utc) + timedelta(minutes=auto_approve_minutes)
+        ).isoformat()
 
-            db.insert_pending(
-                conn, post["post_id"], post["thread_id"], post["forum_id"],
-                profile.reversed_username, reply_text, auto_approve_at,
-            )
-            logging.info("Queued reply from %s for post %d", profile.reversed_username, post["post_id"])
+        db.insert_pending(
+            conn, post["post_id"], post["thread_id"], post["forum_id"],
+            profile.reversed_username, reply_text, auto_approve_at,
+        )
+        logging.info("Queued reply from %s for post %d", profile.reversed_username, post["post_id"])
 
+    # Phase 4: mark all evaluated posts as seen so they are not reprocessed
+    for post in evaluated_posts:
         db.mark_seen(conn, post["post_id"], post["thread_id"], post["forum_id"])
 
 
 def main():
-    required_vars = ["GOOGLE_API_KEY", "FORUM_USERNAME", "FORUM_PASSWORD", "ALTER_PASSWORD"]
+    required_vars = ["GOOGLE_API_KEY", "FORUM_USERNAME", "FORUM_PASSWORD", "ALTER_PASSWORD", "FORUM_URL"]
     missing = [v for v in required_vars if not os.getenv(v)]
     if missing:
         raise SystemExit(f"Missing env vars: {', '.join(missing)}")
@@ -99,6 +135,7 @@ def main():
     lookback_hours = int(os.getenv("LOOKBACK_HOURS", "48"))
     poll_interval = int(os.getenv("POLL_INTERVAL", "300"))
     auto_approve_minutes = int(os.getenv("AUTO_APPROVE_MINUTES", "10"))
+    replies_per_cycle = int(os.getenv("REPLIES_PER_CYCLE", "3"))
     alter_password = os.getenv("ALTER_PASSWORD")
 
     profiles = _load_profiles("personas")
@@ -125,7 +162,8 @@ def main():
     logging.info("Processing posts newer than %s (LOOKBACK_HOURS=%d)", cutoff.isoformat(), lookback_hours)
 
     while True:
-        _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff, auto_approve_minutes)
+        _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
+                   auto_approve_minutes, replies_per_cycle)
 
         for entry in db.get_pending_auto_approve(conn):
             logging.info("Auto-approving reply %d for %s", entry["id"], entry["alter_username"])
