@@ -44,17 +44,20 @@ def evaluate_post(
     passed: list[tuple[PersonaProfile, float]] = []
 
     for profile in profiles:
-        mentioned = profile.reversed_username.lower() in content.lower()
-        tag_match = any(tag.lower() in content.lower() for tag in profile.interest_tags)
-
-        if not mentioned and not tag_match:
-            weight = profile.topic_weights.get(forum_name, 0.0)
-            if weight < _RELEVANCE_THRESHOLD:
-                continue
-            if random.random() >= weight:
-                continue
+        if profile.reversed_username in post.get("quoted_alters", set()):
+            weight = 1.0
         else:
-            weight = profile.topic_weights.get(forum_name, 1.0)
+            mentioned = profile.reversed_username.lower() in content.lower()
+            tag_match = any(tag.lower() in content.lower() for tag in profile.interest_tags)
+
+            if not mentioned and not tag_match:
+                weight = profile.topic_weights.get(forum_name, 0.0)
+                if weight < _RELEVANCE_THRESHOLD:
+                    continue
+                if random.random() >= weight:
+                    continue
+            else:
+                weight = profile.topic_weights.get(forum_name, 1.0)
 
         hourly = db.get_hourly_count(conn, profile.reversed_username, hour_key)
         daily = db.get_daily_count(conn, profile.reversed_username, day_key)

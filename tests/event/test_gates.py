@@ -174,3 +174,35 @@ def test_detect_quoted_alters_can_find_multiple():
     }
     result = detect_quoted_alters(post, profiles)
     assert result == {"ejdar", "nboj"}
+
+
+def test_quoted_alter_gets_max_weight(conn):
+    profile = _make_profile(reversed_username="ejdar", forum_name="Offtopic", weight=0.0)
+    post = _make_post(forum_name="Zwam", content="Originally Posted by ejdar\nhello")
+    post["quoted_alters"] = {"ejdar"}
+    result = evaluate_post(post, [profile], conn)
+    assert len(result) == 1
+    _, weight = result[0]
+    assert weight == 1.0
+
+
+def test_quoted_alter_still_respects_rate_cap(conn):
+    from src.event.db import increment_rate
+    from datetime import datetime, timezone
+    profile = _make_profile(reversed_username="ejdar", forum_name="Offtopic", weight=0.0, hourly_cap=1)
+    post = _make_post(forum_name="Zwam", content="Originally Posted by ejdar\nhello")
+    post["quoted_alters"] = {"ejdar"}
+    now = datetime.now(timezone.utc)
+    hour_key = now.strftime("%Y-%m-%dT%H")
+    day_key = now.strftime("%Y-%m-%d")
+    increment_rate(conn, "ejdar", hour_key, day_key)
+    result = evaluate_post(post, [profile], conn)
+    assert result == []
+
+
+def test_non_quoted_alter_uses_normal_logic(conn):
+    profile = _make_profile(reversed_username="ejdar", forum_name="Offtopic", weight=0.0)
+    post = _make_post(forum_name="Zwam", content="Gewoon een bericht")
+    post["quoted_alters"] = set()
+    result = evaluate_post(post, [profile], conn)
+    assert result == []
