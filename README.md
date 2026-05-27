@@ -91,17 +91,24 @@ sequenceDiagram
         end
 
         loop each unseen post
+            EP->>Gates: detect_quoted_alters(post, profiles)
+            Gates-->>EP: set of quoted alter names
             EP->>Gates: evaluate_post(post, profiles)
             Gates-->>EP: (profile, weight) pairs — 0–2 per post
         end
 
-        Note over EP: sort all candidates by weight,<br/>take top REPLIES_PER_CYCLE (default 3)
+        Note over EP: sort by weight, deduplicate (alter+thread),<br/>take top REPLIES_PER_CYCLE (default 3)
 
         loop each selected candidate
-            EP->>Forum: fetch thread context
-            Forum-->>EP: recent posts in thread
-            EP->>Gemini: generate_reply(persona, context)
-            Gemini-->>EP: reply text
+            alt post quotes this alter
+                EP->>Gemini: generate_quote_reply(persona, post)
+                Gemini-->>EP: reply text
+            else normal reply
+                EP->>Forum: fetch thread context
+                Forum-->>EP: recent posts in thread
+                EP->>Gemini: generate_reply(persona, context)
+                Gemini-->>EP: reply text
+            end
             EP->>DB: insert_pending(reply, auto_approve_at)
         end
 
@@ -260,7 +267,7 @@ src/
   scraper/                # Forum scrapers (member list, profiles)
   selection/              # Account selection pipeline
 
-tests/                    # pytest, 106 tests
+tests/                    # pytest, 129 tests
 docs/superpowers/
   specs/                  # Design documents
   plans/                  # Implementation plans
