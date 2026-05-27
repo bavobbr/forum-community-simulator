@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from src.event.generator import generate_reply
+from src.event.generator import generate_reply, generate_quote_reply
 from src.persona.models import PersonaProfile
 
 
@@ -63,3 +63,35 @@ def test_generate_reply_raises_on_api_error():
     with patch("src.event.generator.call_llm_raw", side_effect=RuntimeError("API down")):
         with pytest.raises(RuntimeError):
             generate_reply(_make_profile(), _TRIGGERING, _CONTEXT)
+
+
+_TRIGGERING_QUOTE = {"post_id": 99, "author": "RealUser", "content": "ejdar ik ben het niet eens met jou"}
+
+
+def test_generate_quote_reply_calls_api():
+    with patch("src.event.generator.call_llm_raw", return_value=_make_mock_resp()) as mock_raw:
+        result = generate_quote_reply(_make_profile(), _TRIGGERING_QUOTE)
+    assert result == "Da valt mee"
+    mock_raw.assert_called_once()
+
+
+def test_generate_quote_reply_prompt_contains_framing():
+    with patch("src.event.generator.call_llm_raw", return_value=_make_mock_resp()) as mock_raw:
+        generate_quote_reply(_make_profile(), _TRIGGERING_QUOTE)
+    _system, user_msg, _max = mock_raw.call_args[0]
+    assert "geciteerd" in user_msg
+    assert "RealUser" in user_msg
+    assert "ejdar ik ben het niet eens met jou" in user_msg
+
+
+def test_generate_quote_reply_has_no_context_lines():
+    with patch("src.event.generator.call_llm_raw", return_value=_make_mock_resp()) as mock_raw:
+        generate_quote_reply(_make_profile(), _TRIGGERING_QUOTE)
+    _system, user_msg, _max = mock_raw.call_args[0]
+    assert "Vorige berichten" not in user_msg
+
+
+def test_generate_quote_reply_appends_afgekapt_on_max_tokens():
+    with patch("src.event.generator.call_llm_raw", return_value=_make_mock_resp("Lang antwoord", "MAX_TOKENS")):
+        result = generate_quote_reply(_make_profile(), _TRIGGERING_QUOTE)
+    assert result == "Lang antwoord [afgekapt]"

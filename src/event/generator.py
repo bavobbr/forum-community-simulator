@@ -35,3 +35,23 @@ def generate_reply(
     if resp.candidates[0].finish_reason.name == "MAX_TOKENS":
         reply += " [afgekapt]"
     return reply
+
+
+def generate_quote_reply(profile: PersonaProfile, triggering_post: dict) -> str:
+    """Generate a direct reply to a post that quoted this alter ego. No thread context."""
+    system = build_system_prompt(profile)
+
+    user_content = (
+        f"Iemand heeft jou geciteerd en reageert direct op jou. Reageer terug op dit specifieke bericht:\n\n"
+        f"[Bericht van {triggering_post['author']}:]\n"
+        f"\"{triggering_post['content']}\"\n\n"
+        f"Schrijf één forumreactie zoals {profile.reversed_username} dat zou doen. "
+        f"Schrijf alleen de reactietekst zelf — geen uitleg, geen opmaak, geen opsomming. "
+        f"Citeer de post NIET."
+    )
+
+    resp = call_llm_raw(system, user_content, 2048)
+    reply = resp.text
+    if resp.candidates[0].finish_reason.name == "MAX_TOKENS":
+        reply += " [afgekapt]"
+    return reply
