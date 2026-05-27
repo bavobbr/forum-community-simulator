@@ -2,7 +2,7 @@ import logging
 import os
 import random
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify, render_template_string
 
 from src.event import db
@@ -84,6 +84,42 @@ function toggleEdit(id) {
 </html>"""
 
 
+_STATS_TEMPLATE = """<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="30">
+<title>Shrimp Resurrect — Stats</title>
+<style>
+  body { font-family: monospace; max-width: 900px; margin: 40px auto; padding: 0 20px; background: #1a1a1a; color: #ccc; }
+  h1 { color: #fff; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+  th { text-align: left; border-bottom: 1px solid #444; padding: 6px 10px; color: #888; }
+  td { padding: 6px 10px; border-bottom: 1px solid #333; }
+  .ok   { color: #4caf50; }
+  .hourly { color: #ff9800; }
+  .daily  { color: #f44336; }
+  a { color: #888; }
+</style>
+</head>
+<body>
+<h1>Stats <a href="/" style="font-size:0.6em">← queue</a></h1>
+<p style="color:#666">Auto-refresh: 30s &nbsp;|&nbsp; Hour resets in {{ reset_in }} min</p>
+<table>
+<tr><th>Alter</th><th>Hourly</th><th>Daily (24h)</th><th>Status</th></tr>
+{% for r in persona_stats %}
+<tr>
+  <td>{{ r.name }}</td>
+  <td>{{ r.hourly_used }}/{{ r.hourly_cap }}</td>
+  <td>{{ r.daily_used }}/{{ r.daily_cap }}</td>
+  <td class="{{ r.status }}">{{ r.status|upper }}</td>
+</tr>
+{% endfor %}
+</table>
+</body>
+</html>"""
+
+
 def _do_approve(conn, entry: dict, alter_password: str, live_mode: bool) -> bool:
     if live_mode:
         success = poster.post_reply(
@@ -108,6 +144,31 @@ def _do_approve(conn, entry: dict, alter_password: str, live_mode: bool) -> bool
         if live_mode:
             time.sleep(random.uniform(60, 180))
     return success
+
+
+def _build_persona_stats(profiles, rate_stats: dict) -> list[dict]:
+    rows = []
+    for profile in profiles:
+        name = profile.reversed_username
+        used = rate_stats.get(name, {})
+        hourly_used = used.get("hourly", 0)
+        daily_used = used.get("daily", 0)
+        if daily_used >= profile.daily_cap:
+            status = "daily"
+        elif hourly_used >= profile.hourly_cap:
+            status = "hourly"
+        else:
+            status = "ok"
+        rows.append({
+            "name": name,
+            "hourly_used": hourly_used,
+            "hourly_cap": profile.hourly_cap,
+            "daily_used": daily_used,
+            "daily_cap": profile.daily_cap,
+            "status": status,
+        })
+    rows.sort(key=lambda r: (0 if r["status"] == "daily" else 1 if r["status"] == "hourly" else 2, r["name"]))
+    return rows
 
 
 def create_app(conn, profiles, alter_password: str, live_mode: bool) -> Flask:
@@ -178,5 +239,17 @@ def create_app(conn, profiles, alter_password: str, live_mode: bool) -> Flask:
             "pending_count": len(db.get_pending(conn)),
             "posts_today": db.get_daily_posts_summary(conn, day_key),
         })
+
+    @app.route("/stats")
+    def stats():
+        now = datetime.now(timezone.utc)
+        hour_key = now.strftime("%Y-%m-%dT%H")
+        cutoff_hour_key = (now - timedelta(hours=24)).strftime("%Y-%m-%dT%H")
+        rate_stats = db.get_all_rate_stats(conn, hour_key, cutoff_hour_key)
+        persona_stats = _build_persona_stats(profiles, rate_stats)
+        reset_in = 60 - now.minute
+        return render_template_string(
+            _STATS_TEMPLATE, persona_stats=persona_stats, reset_in=reset_in
+        )
 
     return app
