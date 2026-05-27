@@ -40,7 +40,7 @@ def test_discard_removes_from_queue(app):
     reply_id = insert_pending(conn, 1, 100, 9, "ejdar", "reply")
     with flask_app.test_client() as c:
         resp = c.post(f"/reply/{reply_id}/discard")
-    assert resp.status_code == 204
+    assert resp.status_code == 302
     with flask_app.test_client() as c:
         resp = c.get("/")
     assert b"reply" not in resp.data
@@ -51,7 +51,7 @@ def test_edit_updates_reply_text(app):
     reply_id = insert_pending(conn, 1, 100, 9, "ejdar", "origineel")
     with flask_app.test_client() as c:
         resp = c.post(f"/reply/{reply_id}/edit", data={"reply_text": "aangepast"})
-    assert resp.status_code == 204
+    assert resp.status_code == 302
     from src.event.db import get_pending_by_id
     row = get_pending_by_id(conn, reply_id)
     assert row["reply_text"] == "aangepast"

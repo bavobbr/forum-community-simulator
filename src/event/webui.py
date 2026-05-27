@@ -3,7 +3,7 @@ import os
 import random
 import time
 from datetime import datetime, timezone, timedelta
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, redirect, render_template_string
 
 from src.event import db
 from src.event import thread_scraper
@@ -210,12 +210,12 @@ def create_app(conn, profiles, alter_password: str, live_mode: bool) -> Flask:
         if not entry or entry["status"] != "pending":
             return "Not found", 404
         _do_approve(conn, dict(entry), alter_password, live_mode)
-        return "", 204
+        return redirect("/")
 
     @app.route("/reply/<int:reply_id>/discard", methods=["POST"])
     def discard(reply_id):
         db.update_status(conn, reply_id, "discarded")
-        return "", 204
+        return redirect("/")
 
     @app.route("/reply/<int:reply_id>/edit", methods=["POST"])
     def edit(reply_id):
@@ -225,9 +225,9 @@ def create_app(conn, profiles, alter_password: str, live_mode: bool) -> Flask:
         db.update_reply_text(conn, reply_id, new_text)
         entry = db.get_pending_by_id(conn, reply_id)
         if not entry or entry["status"] != "pending":
-            return "Not found", 404
+            return redirect("/")
         _do_approve(conn, dict(entry), alter_password, live_mode)
-        return "", 204
+        return redirect("/")
 
     @app.route("/reply/<int:reply_id>/regenerate", methods=["POST"])
     def regenerate(reply_id):
@@ -250,7 +250,7 @@ def create_app(conn, profiles, alter_password: str, live_mode: bool) -> Flask:
         except Exception as exc:
             logging.warning("Regenerate failed for reply %d: %s", reply_id, exc)
             return "Generation failed", 500
-        return "", 204
+        return redirect("/")
 
     @app.route("/status")
     def status():
