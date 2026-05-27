@@ -84,27 +84,31 @@ sequenceDiagram
     Forum-->>EP: session cookie
 
     loop every 5 minutes
-        EP->>Forum: fetch new posts
-        Forum-->>EP: post list
+        EP->>Forum: getdaily → searchid → thread list (pp=100)
+        loop each thread
+            EP->>Forum: showthread (goto=newpost)
+            Forum-->>EP: posts on that page
+        end
 
         loop each unseen post
             EP->>Gates: evaluate_post(post, profiles)
-            Gates-->>EP: matched alter egos (0-2)
-
-            loop each matched alter ego
-                EP->>Forum: fetch thread context
-                Forum-->>EP: recent posts in thread
-                EP->>Gemini: generate_reply(persona, context)
-                Gemini-->>EP: reply text
-                EP->>DB: insert_pending(reply)
-            end
-
-            EP->>DB: mark_seen(post_id)
+            Gates-->>EP: (profile, weight) pairs — 0–2 per post
         end
 
+        Note over EP: sort all candidates by weight,<br/>take top REPLIES_PER_CYCLE (default 3)
+
+        loop each selected candidate
+            EP->>Forum: fetch thread context
+            Forum-->>EP: recent posts in thread
+            EP->>Gemini: generate_reply(persona, context)
+            Gemini-->>EP: reply text
+            EP->>DB: insert_pending(reply, auto_approve_at)
+        end
+
+        EP->>DB: mark_seen (all evaluated posts)
         EP->>DB: get_pending_auto_approve()
-        DB-->>EP: overdue auto-approvals
-        EP->>Forum: post replies if LIVE_MODE=true
+        DB-->>EP: overdue replies
+        EP->>Forum: post if LIVE_MODE=true
     end
 
     Operator->>WebUI: open localhost:5000
@@ -186,13 +190,15 @@ GOOGLE_API_KEY=your_gemini_key
 FORUM_USERNAME=wokebot
 FORUM_PASSWORD=wokebot123
 ALTER_PASSWORD=shared_password_for_alter_egos
+FORUM_URL=https://your.forum.url
 
 # Optional
 LIVE_MODE=false          # true = actually post; false = simulate only
 LOOKBACK_HOURS=48        # ignore posts older than this on startup
 POLL_INTERVAL=300        # seconds between forum polls
 SEARCH_DELAY=6           # seconds between post-history requests (forum rate limit)
-FORUM_URL=https://forum.shrimprefuge.be
+AUTO_APPROVE_MINUTES=10  # minutes before a queued reply auto-approves
+REPLIES_PER_CYCLE=3      # max LLM replies generated per poll cycle
 ```
 
 ---
@@ -254,7 +260,7 @@ src/
   scraper/                # Forum scrapers (member list, profiles)
   selection/              # Account selection pipeline
 
-tests/                    # pytest, 84 tests
+tests/                    # pytest, 106 tests
 docs/superpowers/
   specs/                  # Design documents
   plans/                  # Implementation plans
@@ -272,22 +278,86 @@ docs/superpowers/
 
 ---
 
-## Gates — who responds to what
+## Reply selection — how it works
 
-A post triggers the gate evaluation for every loaded persona:
+Each poll cycle runs in two stages: gate evaluation (per post × per persona) and cycle-level selection.
 
-1. **Excluded forums** (Discretie, HQ, Forum Games, Donations) — always skip
-2. **Direct mention** of the alter ego's username — always enter candidate pool
-3. **Topic weight** — each persona has per-forum weights; post must clear 0.20 threshold and pass a weighted random roll
-4. **Rate limits** — each persona has hourly and daily caps tracked in SQLite
-5. **Max 2 responders** per post — top-weighted candidates win
+### Stage 1 — Gate evaluation
+
+Every unseen post is checked against every loaded persona. For each pair, the gates run in order and the first match wins:
+
+| # | Gate | Result |
+|---|------|--------|
+| 1 | Post author is an alter ego | Skip — no alter-to-alter replies |
+| 2 | Post is from an excluded forum (Discretie, HQ, Forum Games, Donations) | Skip |
+| 3 | Post quotes this alter's reversed username | Pass — weight 1.0, skip to rate check |
+| 4 | Post mentions this alter's reversed username | Pass — weight 1.0, skip to rate check |
+| 5 | Any of this persona's interest tags appears in the post | Pass — weight = forum weight or 1.0 |
+| 6 | Per-forum topic weight < 0.20 | Skip |
+| 7 | `random() >= topic_weight` | Skip (stochastic) |
+| 8 | Hourly count ≥ `hourly_cap` (default 3) | Skip — rate limited |
+| 9 | Rolling 24h count ≥ `daily_cap` (default 10) | Skip — daily cap reached |
+| — | Passes all gates | Add to candidate pool — max 2 per post |
+
+### Stage 2 — Cycle-level selection
+
+Once all posts have been evaluated, candidates from the whole cycle are ranked and filtered:
+
+1. Sort all `(post, persona, weight)` candidates by weight, descending.
+2. Walk through in order — skip any `(alter, thread)` pair already chosen this cycle (one reply per alter per thread).
+3. Stop when **`REPLIES_PER_CYCLE`** (default 3) candidates are selected.
+4. Generate an LLM reply for each selected candidate.
+
+This two-stage approach prevents startup bursts (a full day's backlog triggering mass replies), thread spamming (same alter replying to 3 posts in one thread), and ensures only the highest-relevance interactions happen each cycle.
+
+### Flow diagram
+
+```mermaid
+flowchart TD
+    A([New post]) --> B{Author is\nan alter ego?}
+    B -- yes --> SKIP1([Skip])
+    B -- no --> C{Excluded\nforum?}
+    C -- yes --> SKIP2([Skip])
+    C -- no --> D{Post quotes\nthis alter?}
+    D -- yes --> W1[weight = 1.0]
+    W1 --> RATE
+    D -- no --> E{Username\nmentioned?}
+    E -- yes --> W2[weight = 1.0]
+    W2 --> RATE
+    E -- no --> F{Interest tag\nmatches?}
+    F -- yes --> W3[weight = forum weight]
+    W3 --> RATE
+    F -- no --> G{topic_weight\n< 0.20?}
+    G -- yes --> SKIP3([Skip])
+    G -- no --> H{random ≥\ntopic_weight?}
+    H -- yes --> SKIP4([Skip])
+    H -- no --> W4[weight = topic_weight]
+    W4 --> RATE
+
+    RATE{hourly count\n≥ hourly_cap?}
+    RATE -- yes --> SKIP5([Skip — rate cap])
+    RATE -- no --> RATE2{rolling 24h count\n≥ daily_cap?}
+    RATE2 -- yes --> SKIP6([Skip — daily cap])
+    RATE2 -- no --> POOL[Add to candidate pool\nmax 2 per post]
+
+    POOL --> CYCLE
+
+    subgraph CYCLE[Cycle selection]
+        S1[Sort all candidates\nby weight ↓] --> S2
+        S2{alter + thread\nalready selected?} -- yes --> S3([Skip])
+        S2 -- no --> S4[Select candidate]
+        S4 --> S5{REPLIES_PER_CYCLE\nreached?}
+        S5 -- no --> S2
+        S5 -- yes --> S6([Generate LLM replies])
+    end
+```
 
 ---
 
 ## Tests
 
 ```bash
-pytest                     # all 84 tests
+pytest                     # all 129 tests
 pytest -v tests/event/     # event layer only
 pytest --cov=src           # with coverage
 ```
