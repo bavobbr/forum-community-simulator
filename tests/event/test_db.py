@@ -66,7 +66,9 @@ def test_auto_approve_queue(conn):
 
 
 def test_insert_posted_and_summary(conn):
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     insert_posted(conn, "ejdar", 100, 1, "reply", simulated=False)
     insert_posted(conn, "ejdar", 101, 2, "reply2", simulated=True)
-    summary = get_daily_posts_summary(conn, "2026-05-25")
+    summary = get_daily_posts_summary(conn, today)
     assert summary.get("ejdar", 0) == 2
