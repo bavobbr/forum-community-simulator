@@ -67,8 +67,18 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
             candidates.append((post, profile, weight))
 
     # Phase 2: pick the top N most relevant candidates for this cycle
+    # Skip duplicate (alter, thread) pairs — one reply per alter per thread per cycle
     candidates.sort(key=lambda x: x[2], reverse=True)
-    selected = candidates[:replies_per_cycle]
+    selected: list[tuple[dict, PersonaProfile, float]] = []
+    seen_alter_thread: set[tuple[str, int]] = set()
+    for post, profile, weight in candidates:
+        key = (profile.reversed_username, post["thread_id"])
+        if key in seen_alter_thread:
+            continue
+        seen_alter_thread.add(key)
+        selected.append((post, profile, weight))
+        if len(selected) >= replies_per_cycle:
+            break
     logging.info(
         "Cycle: %d new posts, %d candidates, %d selected (cap=%d)",
         len(evaluated_posts), len(candidates), len(selected), replies_per_cycle,
