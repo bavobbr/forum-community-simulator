@@ -1,23 +1,27 @@
 """
-Verify that fetch_new_posts correctly retrieves posts from search.php?do=getnew.
+Verify that fetch_new_posts correctly retrieves posts via the getnew thread list.
 
 Run from project root:
     python verify_poller.py
+
+NOTE: VBulletin updates "last visit" on each getnew call, so a second run right
+after the first will return 0 threads until new posts appear on the forum.
 """
+import logging
 import os
-import re
 from datetime import datetime, timezone, timedelta
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from src.session import VBulletinSession
-from src.persona.scraper import parse_posts_page
-from src.event.poller import fetch_new_posts, parse_post_date, _follow_meta_refresh
+logging.basicConfig(level=logging.DEBUG, format="%(levelname)s %(message)s")
 
-_META_REFRESH_RE = re.compile(
-    r'<meta[^>]+http-equiv=["\']refresh["\'][^>]+url=["\']?([^"\'>\s]+)', re.IGNORECASE
+from src.session import VBulletinSession
+from src.event.poller import (
+    fetch_new_posts, parse_post_date, parse_new_thread_list,
+    _resolve_search_page, _META_REFRESH_RE, _SEARCHID_RE,
 )
+from src.event.thread_scraper import parse_thread_page
 
 
 def main() -> None:
@@ -28,51 +32,40 @@ def main() -> None:
         return
     print("Login OK\n")
 
-    # Step 1: raw fetch — check what VBulletin returns before any redirect handling
-    print("Fetching search.php?do=getnew (raw) ...")
-    raw_html = session.get("search.php?do=getnew")
+    # Component test: verify a known thread page parses correctly
+    print("Component test: fetching one thread page directly ...")
+    test_html = session.get("showthread.php?t=17209")
+    test_posts = parse_thread_page(test_html)
+    print(f"  showthread.php?t=17209 → {len(test_posts)} posts parsed")
+    if test_posts:
+        p = test_posts[-1]
+        print(f"  Last post: #{p['post_id']} by {p['author']} | {p['content'][:60]}")
 
-    has_post_rows = bool(re.search(r'<table[^>]+id="post\d+', raw_html))
-    has_meta_refresh = bool(_META_REFRESH_RE.search(raw_html))
-    searchid_match = re.search(r'searchid=(\d+)', raw_html)
-
-    print(f"  Response size     : {len(raw_html):,} chars")
-    print(f"  Post rows present : {has_post_rows}")
-    print(f"  Meta-refresh      : {has_meta_refresh}")
-    print(f"  Searchid in page  : {searchid_match.group(1) if searchid_match else 'no'}")
-
-    if not has_post_rows and not has_meta_refresh and not searchid_match:
-        print("\nUnexpected response — first 1000 chars:")
-        print(raw_html[:1000])
-        return
-
-    # Step 2: use fetch_new_posts (which now handles meta-refresh)
-    print("\nCalling fetch_new_posts (with meta-refresh handling) ...")
+    # Full end-to-end test — getdaily is stateless so no re-login needed
+    print("\nCalling fetch_new_posts (getdaily — last 24h) ...")
     posts = fetch_new_posts(session)
-    print(f"  Posts returned    : {len(posts)}")
+    print(f"\n  Posts returned    : {len(posts)}")
 
     if not posts:
-        print("  No posts — forum may be quiet or all posts are in excluded forums.")
+        print("  0 posts — either forum is quiet or last-visit was already up-to-date.")
+        print("  (Run again after new posts appear on the forum to verify end-to-end.)")
         return
 
-    # Step 3: show breakdown
     cutoff_48h = datetime.now(timezone.utc) - timedelta(hours=48)
     recent = [p for p in posts if (d := parse_post_date(p.get("date", ""))) and d >= cutoff_48h]
-
     print(f"  Within last 48h   : {len(recent)}/{len(posts)}")
-    print()
 
     forums: dict[str, int] = {}
     for p in posts:
         forums[p.get("forum_name", "?")] = forums.get(p.get("forum_name", "?"), 0) + 1
-    print("  Posts by forum:")
+    print("\n  Posts by forum:")
     for forum, count in sorted(forums.items(), key=lambda x: -x[1]):
         print(f"    {forum:30} {count}")
 
-    print()
-    print("  Most recent 10 posts:")
+    print("\n  Most recent 10 posts:")
     for p in sorted(posts, key=lambda x: x["post_id"], reverse=True)[:10]:
-        print(f"    [{p['date']}] {p['forum_name']:20} | {p['thread_title'][:45]}")
+        print(f"    [{p['date']}] {p['forum_name']:20} | {p['thread_title'][:40]}")
+        print(f"      by {p['author']:20} : {p['content'][:80]}")
 
 
 if __name__ == "__main__":

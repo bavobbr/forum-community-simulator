@@ -80,6 +80,7 @@ Key fields for AI context:
 | `persona_summary` | `str` | 6–10 sentence narrative description of the person |
 | `worldview` | `str` | Core values, outlook, and philosophy of life |
 | `rhetorical_patterns` | `list[str]` | How the member argues and engages in discussion |
+| `interest_tags` | `list[str]` | 10–15 concrete keywords (names, games, teams, brands) that trigger a response even when `topic_weights` are low |
 | `example_posts` | `list[str]` | Few-shot examples used in the system prompt |
 
 `worldview` and `rhetorical_patterns` are used by both the analyzer and the generator to give the LLM deeper character context when generating replies to topics the member never directly addressed.
@@ -127,6 +128,8 @@ Rich markup escaping (`rich.markup.escape`) is applied to all LLM-generated text
 - Members-only forums (Zwam, f=9) require authentication to access
 - Excluded forums: Discretie (f=40), Shrimp Refuge HQ (f=20), Forum Games (f=42), Donations (f=29)
 - Scanning account: `wokebot` / `wokebot123` (forum scanning only, not an alter ego)
+- **New-post polling** uses `search.php?do=getdaily` (last 24h, stateless — not consumed by checking). Flow: `getdaily` → 302 redirect → `search.php?searchid=X` (thread list) → re-fetch with `&pp=100` for up to 100 threads → for each thread: `showthread.php?goto=newpost&t={id}` (redirects to the page with the newest unread post) → `parse_thread_page()`. Post dicts gain `thread_id`, `thread_title`, `forum_id`, `forum_name` from the thread list row.
+- Date strings from `showthread` pages can be absolute (`DD-MM-YYYY, HH:MM`) or relative (`Today, HH:MM` / `Yesterday, HH:MM`); `parse_post_date()` handles both, treating all times as UTC+2.
 
 ## Environment variables
 
@@ -136,6 +139,7 @@ GOOGLE_API_KEY=...
 FORUM_USERNAME=wokebot
 FORUM_PASSWORD=wokebot123
 ALTER_PASSWORD=...        # shared password for all alter ego accounts
+FORUM_URL=...             # base URL of the VBulletin forum (no trailing slash)
 ```
 
 Optional:
@@ -144,12 +148,42 @@ LIVE_MODE=false           # true = actually post replies; false = simulate only
 LOOKBACK_HOURS=48         # ignore posts older than this on startup
 POLL_INTERVAL=300         # seconds between forum polls
 SEARCH_DELAY=6            # seconds between post-history requests
+AUTO_APPROVE_MINUTES=10   # minutes before a queued reply auto-approves
+REPLIES_PER_CYCLE=3       # max replies generated per poll cycle (see algorithm below)
 ```
+
+## Event poll algorithm (`event.py` + `src/event/`)
+
+Each poll cycle (every `POLL_INTERVAL` seconds) runs in four phases:
+
+**Phase 1 — Fetch.** `poller.fetch_new_posts(scanner)` calls `search.php?do=getdaily`, resolves the searchid redirect to get a thread list, then fetches `showthread.php?goto=newpost&t={id}` for each thread. Returns a flat `list[dict]` of posts, each with `post_id`, `thread_id`, `thread_title`, `forum_id`, `forum_name`, `author`, `content`, `date`. Excluded forums are filtered out before returning.
+
+**Phase 2 — Evaluate.** For every post not yet in `seen_posts`:
+- Skip posts older than `LOOKBACK_HOURS` (mark seen immediately).
+- Skip image-only posts (`[afbeelding]` with no text).
+- Call `gates.evaluate_post(post, profiles, conn)` → `list[tuple[PersonaProfile, float]]` (at most `_MAX_RESPONDERS = 2` per post to prevent pile-ons).
+  - Gate logic per profile:
+    1. **Mention bypass**: if the alter's reversed username appears in the content, pass (weight defaults to 1.0).
+    2. **Tag bypass**: if any `interest_tag` appears (case-insensitive) in the content, pass.
+    3. **Topic weight**: otherwise, skip if `topic_weights[forum] < 0.2`; then stochastic skip with `random() >= weight`.
+    4. **Rate cap**: skip if `hourly_count >= hourly_cap` or `daily_count >= daily_cap` (checked in `rate_counters` DB table; only incremented in live mode).
+  - Survivors sorted by weight descending; top 2 returned with their weights.
+
+**Phase 3 — Cap & generate.** Collect all `(post, profile, weight)` pairs from the entire cycle. Sort by weight descending. Take the top `REPLIES_PER_CYCLE` (default 3). For each selected pair:
+- Fetch thread context via `thread_scraper.fetch_thread_context`.
+- Call `event_generator.generate_reply(profile, triggering_post, context)`.
+- Insert into `pending_replies` with `auto_approve_at = now + AUTO_APPROVE_MINUTES`.
+
+The cycle cap is the primary anti-spam control: it prevents startup bursts (getdaily returning a day's backlog) and ensures only the highest-relevance interactions happen each cycle. Unselected candidates are still marked seen; old posts do not keep competing with new activity.
+
+**Phase 4 — Mark seen.** All posts evaluated in the cycle are written to `seen_posts`, regardless of whether they generated a reply.
+
+**Auto-approve loop.** After each poll, `db.get_pending_auto_approve` finds replies whose `auto_approve_at` has passed and calls `_do_approve`. In live mode this calls `poster.post_reply()`, increments `rate_counters`, and sleeps 60–180 s to look human.
 
 ## Testing
 
 ```bash
-pytest                    # run all 84 tests
+pytest                    # run all 106 tests
 pytest tests/test_llm.py  # LLM wrapper tests
 ```
 
@@ -163,5 +197,7 @@ All three plans complete:
 1. Account selection — 25 approved alter egos in `config/approved_accounts.json`
 2. Persona workbench — fully functional, uses `gemini-3.1-pro-preview` for analysis, `gemini-3.5-flash` for sample previews
 3. Event orchestrator — fully functional, uses `gemini-3.5-flash`
+
+Poller verified end-to-end: `getdaily` → thread list (18 threads) → 245 posts across 17 forums. Cycle cap + individual rate caps confirmed working.
 
 **Next step:** Set `GOOGLE_API_KEY` in `.env` and run `python workbench.py` to build personas, then `python event.py` for the live event.

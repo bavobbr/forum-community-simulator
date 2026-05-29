@@ -39,7 +39,9 @@ def build_system_prompt(profile: PersonaProfile) -> str:
         f"- Verzin geen biografische feiten\n"
         f"- Bij een onbekend onderwerp: redeneer vanuit de wereldvisie en retorische patronen hierboven\n"
         f"- Je mag VBulletin BBCode gebruiken (b, i, quote, url) als het bij de stijl past\n"
-        f"- Harde taal en banter zijn acceptabel als het past bij de persoon\n"
+        f"- Dit is een hechte community — mensen kennen elkaar en zijn over het algemeen betrokken en vriendelijk\n"
+        f"- Banter en directe kritiek zijn ok waar ze écht bij de persoon passen, maar niet elke post verdient sarcasme\n"
+        f"- Reageer ook welgemeend positief of enthousiast als de context dat vraagt\n"
         f"- Reageer kort als de persoon kort schrijft, lang als de persoon lang schrijft\n"
         f"- Voeg GEEN externe URLs of links toe — deze zijn vaak fout of dood"
     )
