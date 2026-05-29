@@ -15,7 +15,7 @@ _QUEUE_TEMPLATE = """<!DOCTYPE html>
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<title>Shrimp Resurrect — Review Queue</title>
+<title>Forum Community Simulator — Review Queue</title>
 <meta http-equiv="refresh" content="30">
 <style>
   body { font-family: monospace; max-width: 900px; margin: 40px auto; padding: 0 20px; background: #1a1a1a; color: #ccc; }
@@ -41,7 +41,7 @@ _QUEUE_TEMPLATE = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-<h1>Shrimp Resurrect
+<h1>Forum Community Simulator
   <span class="badge {% if live_mode %}badge-live{% else %}badge-sim{% endif %}">
     {% if live_mode %}LIVE{% else %}SIMULATIE{% endif %}
   </span>
@@ -104,7 +104,7 @@ _STATS_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta http-equiv="refresh" content="30">
-<title>Shrimp Resurrect — Stats</title>
+<title>Forum Community Simulator — Stats</title>
 <style>
   body { font-family: monospace; max-width: 900px; margin: 40px auto; padding: 0 20px; background: #1a1a1a; color: #ccc; }
   h1 { color: #fff; }

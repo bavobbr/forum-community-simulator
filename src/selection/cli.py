@@ -9,7 +9,7 @@ console = Console()
 
 def run_approval_ui(proposal: list[AlterEgo]) -> list[AlterEgo]:
     approved = []
-    console.print("\n[bold cyan]Shrimp Resurrect — Account Selection[/bold cyan]\n")
+    console.print("\n[bold cyan]Forum Community Simulator — Account Selection[/bold cyan]\n")
     console.print(
         f"Proposed alter egos ({len(proposal)} candidates). "
         "For each: [green]y[/green]=approve, [red]n[/red]=skip, [yellow]q[/yellow]=quit.\n"

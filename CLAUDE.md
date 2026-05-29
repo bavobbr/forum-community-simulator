@@ -1,4 +1,4 @@
-# Shrimp Resurrect — Claude Context
+# Forum Community Simulator — Claude Context
 
 ## What this project does
 

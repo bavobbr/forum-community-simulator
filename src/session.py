@@ -14,7 +14,7 @@ class VBulletinSession:
         self.base_url = os.getenv("FORUM_URL", "").rstrip("/")
         self.session = requests.Session()
         self.session.headers["User-Agent"] = (
-            "Mozilla/5.0 (compatible; ShrimpResurrect/1.0)"
+            "Mozilla/5.0 (compatible; ForumCommunitySimulator/1.0)"
         )
         self._security_token: str = "guest"
 
