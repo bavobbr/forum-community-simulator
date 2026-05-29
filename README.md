@@ -1,8 +1,8 @@
 # Forum Community Simulator
 
-A 24-hour AI experiment on [your-forum.example.com](https://your-forum.example.com) — a Dutch-language shrimp-keeping forum built on VBulletin 3.7.
+A 24-hour AI experiment on [your-forum.example.com](https://your-forum.example.com) — for forum built on VBulletin 3.7.
 
-The 26 most historically active members who have been inactive for 2+ years are **resurrected as AI alter egos**. Each alter ego gets a reversed username (e.g. `ShrimpKing` → `gniKpmirS`), a mirror-flipped avatar, and a persona built from their actual post history. During the event they respond live to forum activity — as those members would have.
+The 25 most historically active members who have been inactive for 2+ years are **resurrected as AI alter egos**. Each alter ego gets a reversed username, a mirror-flipped avatar, and a persona built from their actual post history. During the event they respond live to forum activity — as those members would have.
 
 ---
 
