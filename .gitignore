@@ -14,3 +14,6 @@ venv/
 personas/
 event.db
 .playwright-mcp/
+
+# Scraped post data (contains real user content)
+test_fetch_posts_results.json

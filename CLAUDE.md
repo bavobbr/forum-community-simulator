@@ -2,7 +2,7 @@
 
 ## What this project does
 
-24-hour AI event on `forum.shrimprefuge.be` (VBulletin 3.7, Dutch-language shrimp-keeping forum). The 26 most historically active members who have been inactive for 2+ years are "resurrected" as AI alter egos. Each alter ego has a reversed username (e.g. `ShrimpKing` → `gniKpmirS`), a mirrored avatar, and a persona built from their actual post history. During the event they respond live to forum activity as those members would have.
+24-hour AI event on `your-forum.example.com` (VBulletin 3.7, Dutch-language shrimp-keeping forum). The 26 most historically active members who have been inactive for 2+ years are "resurrected" as AI alter egos. Each alter ego has a reversed username (e.g. `ShrimpKing` → `gniKpmirS`), a mirrored avatar, and a persona built from their actual post history. During the event they respond live to forum activity as those members would have.
 
 ## Entry points
 

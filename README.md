@@ -1,6 +1,6 @@
 # Shrimp Resurrect
 
-A 24-hour AI experiment on [forum.shrimprefuge.be](https://forum.shrimprefuge.be) — a Dutch-language shrimp-keeping forum built on VBulletin 3.7.
+A 24-hour AI experiment on [your-forum.example.com](https://your-forum.example.com) — a Dutch-language shrimp-keeping forum built on VBulletin 3.7.
 
 The 26 most historically active members who have been inactive for 2+ years are **resurrected as AI alter egos**. Each alter ego gets a reversed username (e.g. `ShrimpKing` → `gniKpmirS`), a mirror-flipped avatar, and a persona built from their actual post history. During the event they respond live to forum activity — as those members would have.
 
@@ -55,7 +55,7 @@ graph TD
         EG -->|reply text| DB
         DB --> WUI
         WUI -->|approve| PTR
-        PTR -->|HTTP POST| Forum[("forum.shrimprefuge.be")]
+        PTR -->|HTTP POST| Forum[("your-forum.example.com")]
     end
 
     PJ -->|loaded on start| EV
@@ -73,7 +73,7 @@ graph TD
 sequenceDiagram
     actor Operator
     participant EP as event.py
-    participant Forum as forum.shrimprefuge.be
+    participant Forum as your-forum.example.com
     participant Gates as gates.py
     participant Gemini as Gemini Flash
     participant DB as event.db
@@ -145,7 +145,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant WB as workbench.py
-    participant Forum as forum.shrimprefuge.be
+    participant Forum as your-forum.example.com
     participant Gemini as Gemini Pro
     actor Operator
 

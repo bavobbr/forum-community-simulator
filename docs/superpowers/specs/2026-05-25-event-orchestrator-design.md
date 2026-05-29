@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-25
 **Project:** Shrimp Resurrect — Plan 3
-**Forum:** https://forum.shrimprefuge.be/ (VBulletin 3.7, Dutch-language)
+**Forum:** https://your-forum.example.com/ (VBulletin 3.7, Dutch-language)
 
 ---
 

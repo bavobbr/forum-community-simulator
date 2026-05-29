@@ -113,7 +113,7 @@ def test_from_dict_handles_missing_optional_fields():
 - [ ] **Step 2: Run test to verify it fails**
 
 ```bash
-cd /home/bavobbr/dev/shrimp-resurrect && python -m pytest tests/persona/test_models.py -v
+cd /home/bavobbr/dev/forum-community-simulator && python -m pytest tests/persona/test_models.py -v
 ```
 
 Expected: `ModuleNotFoundError: No module named 'src.persona'`
@@ -265,7 +265,7 @@ pip install anthropic
 - [ ] **Step 5: Run tests to verify they pass**
 
 ```bash
-cd /home/bavobbr/dev/shrimp-resurrect && python -m pytest tests/persona/test_models.py -v
+cd /home/bavobbr/dev/forum-community-simulator && python -m pytest tests/persona/test_models.py -v
 ```
 
 Expected: 3 tests PASS
@@ -341,7 +341,7 @@ def test_parse_has_next_page_false_on_single_page():
 - [ ] **Step 2: Run tests to verify they fail**
 
 ```bash
-cd /home/bavobbr/dev/shrimp-resurrect && python -m pytest tests/persona/test_scraper.py -v
+cd /home/bavobbr/dev/forum-community-simulator && python -m pytest tests/persona/test_scraper.py -v
 ```
 
 Expected: `ModuleNotFoundError: No module named 'src.persona.scraper'`
@@ -462,7 +462,7 @@ class PostScraper:
 - [ ] **Step 4: Run tests to verify they pass**
 
 ```bash
-cd /home/bavobbr/dev/shrimp-resurrect && python -m pytest tests/persona/test_scraper.py -v
+cd /home/bavobbr/dev/forum-community-simulator && python -m pytest tests/persona/test_scraper.py -v
 ```
 
 Expected: 6 tests PASS
@@ -523,7 +523,7 @@ Create `tests/workbench/__init__.py` (empty).
 - [ ] **Step 2: Verify the file loads correctly**
 
 ```bash
-cd /home/bavobbr/dev/shrimp-resurrect && python -c "
+cd /home/bavobbr/dev/forum-community-simulator && python -c "
 import json
 posts = json.loads(open('config/test_posts.json').read())
 assert len(posts) == 5
@@ -699,7 +699,7 @@ def test_analyze_handles_malformed_json_gracefully():
 - [ ] **Step 2: Run tests to verify they fail**
 
 ```bash
-cd /home/bavobbr/dev/shrimp-resurrect && python -m pytest tests/persona/test_analyzer.py -v
+cd /home/bavobbr/dev/forum-community-simulator && python -m pytest tests/persona/test_analyzer.py -v
 ```
 
 Expected: `ModuleNotFoundError: No module named 'src.persona.analyzer'`
@@ -840,7 +840,7 @@ def refine_with_batch(client, profile: PersonaProfile, posts: list[dict]) -> Per
 - [ ] **Step 4: Run tests to verify they pass**
 
 ```bash
-cd /home/bavobbr/dev/shrimp-resurrect && python -m pytest tests/persona/test_analyzer.py -v
+cd /home/bavobbr/dev/forum-community-simulator && python -m pytest tests/persona/test_analyzer.py -v
 ```
 
 Expected: 4 tests PASS
@@ -951,7 +951,7 @@ def test_generate_replies_api_receives_test_post_content():
 - [ ] **Step 2: Run tests to verify they fail**
 
 ```bash
-cd /home/bavobbr/dev/shrimp-resurrect && python -m pytest tests/persona/test_generator.py -v
+cd /home/bavobbr/dev/forum-community-simulator && python -m pytest tests/persona/test_generator.py -v
 ```
 
 Expected: `ModuleNotFoundError: No module named 'src.persona.generator'`
@@ -1025,7 +1025,7 @@ def generate_replies(client, profile: PersonaProfile, test_posts: list[dict]) ->
 - [ ] **Step 4: Run tests to verify they pass**
 
 ```bash
-cd /home/bavobbr/dev/shrimp-resurrect && python -m pytest tests/persona/test_generator.py -v
+cd /home/bavobbr/dev/forum-community-simulator && python -m pytest tests/persona/test_generator.py -v
 ```
 
 Expected: 4 tests PASS
@@ -1033,7 +1033,7 @@ Expected: 4 tests PASS
 - [ ] **Step 5: Run full test suite**
 
 ```bash
-cd /home/bavobbr/dev/shrimp-resurrect && python -m pytest -v
+cd /home/bavobbr/dev/forum-community-simulator && python -m pytest -v
 ```
 
 Expected: All tests PASS
@@ -1274,7 +1274,7 @@ def run_workbench(
 - [ ] **Step 3: Verify it imports cleanly**
 
 ```bash
-cd /home/bavobbr/dev/shrimp-resurrect && python -c "from src.workbench.cli import run_workbench; print('OK')"
+cd /home/bavobbr/dev/forum-community-simulator && python -c "from src.workbench.cli import run_workbench; print('OK')"
 ```
 
 Expected: `OK`
@@ -1358,7 +1358,7 @@ if __name__ == "__main__":
 - [ ] **Step 3: Verify the entry point imports and runs to the login step**
 
 ```bash
-cd /home/bavobbr/dev/shrimp-resurrect && python -c "
+cd /home/bavobbr/dev/forum-community-simulator && python -c "
 import workbench
 print('imports OK')
 "
@@ -1369,7 +1369,7 @@ Expected: `imports OK`
 - [ ] **Step 4: Run the full test suite one final time**
 
 ```bash
-cd /home/bavobbr/dev/shrimp-resurrect && python -m pytest -v
+cd /home/bavobbr/dev/forum-community-simulator && python -m pytest -v
 ```
 
 Expected: All tests PASS

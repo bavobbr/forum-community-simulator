@@ -13,7 +13,7 @@
 ## File Map
 
 ```
-shrimp-resurrect/
+forum-community-simulator/
 ├── config/
 │   └── approved_accounts.json    # Output — gitignored, created by this plan
 ├── src/
@@ -68,7 +68,7 @@ pytest-cov==5.0.0
 - [ ] **Step 2: Create .env.example**
 
 ```
-FORUM_URL=https://forum.shrimprefuge.be
+FORUM_URL=https://your-forum.example.com
 FORUM_USERNAME=wokebot
 FORUM_PASSWORD=wokebot123
 INACTIVITY_YEARS=2

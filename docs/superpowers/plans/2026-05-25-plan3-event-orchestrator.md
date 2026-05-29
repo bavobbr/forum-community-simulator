@@ -1427,7 +1427,7 @@ def _do_approve(conn, entry: dict, alter_password: str, live_mode: bool) -> bool
 def create_app(conn, client, profiles, alter_password: str, live_mode: bool) -> Flask:
     app = Flask(__name__)
     profile_map = {p.reversed_username: p for p in profiles}
-    forum_url = os.getenv("FORUM_URL", "https://forum.shrimprefuge.be")
+    forum_url = os.getenv("FORUM_URL", "https://your-forum.example.com")
 
     @app.route("/")
     def index():
