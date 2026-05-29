@@ -1,4 +1,4 @@
-# Shrimp Resurrect
+# Forum Community Simulator
 
 A 24-hour AI experiment on [your-forum.example.com](https://your-forum.example.com) — a Dutch-language shrimp-keeping forum built on VBulletin 3.7.
 
