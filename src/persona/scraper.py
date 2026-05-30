@@ -31,7 +31,7 @@ def _extract_post_content(html: str, post_id: int) -> str | None:
         title = img.get("title", "")
         alt = img.get("alt", "")
         if "smilies" in src:
-            img.replace_with(f"({title})" if title else "")
+            img.replace_with(alt if alt else "")
         elif alt:
             img.replace_with(alt)
         else:

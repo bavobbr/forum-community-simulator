@@ -36,3 +36,17 @@ def test_get_raises_on_timeout():
     s.session.get.side_effect = requests.exceptions.Timeout
     with pytest.raises(requests.exceptions.Timeout):
         s.get("slow.php")
+
+
+def test_get_forces_utf8_encoding():
+    s = _make_session()
+    resp = s.session.get.return_value
+    s.get("index.php")
+    assert resp.encoding == "utf-8"
+
+
+def test_post_forces_utf8_encoding():
+    s = _make_session()
+    resp = s.session.post.return_value
+    s.post("login.php", data={})
+    assert resp.encoding == "utf-8"

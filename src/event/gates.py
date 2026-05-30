@@ -1,3 +1,4 @@
+import re
 import random
 import logging
 from datetime import datetime, timezone, timedelta
@@ -8,6 +9,9 @@ from src.event import db
 _EXCLUDED_FORUM_IDS = {20, 29, 40, 42}
 _RELEVANCE_THRESHOLD = 0.2
 _MAX_RESPONDERS = 2
+_MIN_CONTENT_WORDS = 5
+_BBCODE_QUOTE_RE = re.compile(r"\[QUOTE[^\]]*\].*?\[/QUOTE\]", re.IGNORECASE | re.DOTALL)
+_BBCODE_TAG_RE = re.compile(r"\[[^\]]*\]")
 
 
 def detect_quoted_alters(post: dict, profiles: list[PersonaProfile]) -> set[str]:
@@ -37,6 +41,11 @@ def evaluate_post(
         return []
 
     if post["forum_id"] in _EXCLUDED_FORUM_IDS:
+        return []
+
+    stripped = _BBCODE_QUOTE_RE.sub("", post.get("content", ""))
+    stripped = _BBCODE_TAG_RE.sub("", stripped)
+    if len(stripped.split()) < _MIN_CONTENT_WORDS:
         return []
 
     now = datetime.now(timezone.utc)

@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from src.event.thread_scraper import parse_thread_page
 
 _EXCLUDED_FORUM_IDS = {20, 29, 40, 42}
+_EXCLUDED_THREAD_IDS = {23585}  # experiment meta-thread — bots must never post here
 _META_REFRESH_RE = re.compile(
     r'<meta[^>]+http-equiv=["\']refresh["\'][^>]+url=["\']?([^"\'>\s]+)', re.IGNORECASE
 )
@@ -89,6 +90,7 @@ def fetch_new_posts(session) -> list[dict]:
     logging.info("getdaily: %d threads in list", len(threads))
 
     threads = [t for t in threads if t["forum_id"] not in _EXCLUDED_FORUM_IDS]
+    threads = [t for t in threads if t["thread_id"] not in _EXCLUDED_THREAD_IDS]
 
     posts = []
     for thread in threads:

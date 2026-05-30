@@ -231,9 +231,14 @@ def test_extract_post_content_returns_none_when_post_not_found():
     assert _extract_post_content(_SHOWTHREAD_HTML, 99) is None
 
 
-def test_extract_post_content_converts_smilies_to_title():
-    html = '<div id="post_message_1"><img src="smilies/smile.gif" title="Smile" alt=""/> tekst</div>'
-    assert _extract_post_content(html, 1) == "(Smile) tekst"
+def test_extract_post_content_converts_smilies_to_alt_code():
+    html = '<div id="post_message_1"><img src="smilies/smile.gif" alt=":)" title="Smile"/> tekst</div>'
+    assert _extract_post_content(html, 1) == ":) tekst"
+
+
+def test_extract_post_content_smilie_without_alt_is_removed():
+    html = '<div id="post_message_1"><img src="smilies/unknown.gif" alt="" title="Wut"/> tekst</div>'
+    assert _extract_post_content(html, 1) == "tekst"
 
 
 def test_extract_post_content_unknown_image_becomes_afbeelding():

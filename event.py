@@ -174,6 +174,8 @@ def main():
     profile_map = {p.reversed_username: p for p in profiles}
 
     while True:
+        cycle_start = time.time()
+
         _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
                    auto_approve_minutes, replies_per_cycle)
 
@@ -181,7 +183,8 @@ def main():
             logging.info("Auto-approving reply %d for %s", entry["id"], entry["alter_username"])
             _do_approve(conn, dict(entry), alter_password, live_mode, profile_map)
 
-        time.sleep(poll_interval)
+        elapsed = time.time() - cycle_start
+        time.sleep(max(0, poll_interval - elapsed))
 
 
 if __name__ == "__main__":

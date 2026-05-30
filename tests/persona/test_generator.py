@@ -118,6 +118,15 @@ def test_build_system_prompt_omits_neutral_from_interactions():
     assert "charlie" not in prompt
 
 
+def test_build_system_prompt_lists_valid_smilie_codes():
+    prompt = build_system_prompt(_make_profile())
+    assert ":)" in prompt
+    assert ":rolleyes:" in prompt
+    assert ":love:" in prompt
+    assert "(Smile)" not in prompt
+    assert "(Heart)" not in prompt
+
+
 def test_build_system_prompt_omits_interactions_section_when_empty():
     profile = _make_profile()
     profile.frequent_interactions = {}

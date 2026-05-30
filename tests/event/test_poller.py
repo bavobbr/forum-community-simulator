@@ -20,6 +20,23 @@ _THREAD_LIST_HTML = """
   </td>
   <td><a href="forumdisplay.php?f=40">Discretie</a></td>
 </tr>
+<tr id="threadbits_23585">
+  <td class="alt1">
+    <a href="showthread.php?t=23585" id="thread_title_23585"><strong>Over dit experiment</strong></a>
+    <a href="showthread.php?goto=newpost&t=23585" id="thread_gotonew_23585">Go to new</a>
+  </td>
+  <td><a href="forumdisplay.php?f=9">Zwam</a></td>
+</tr>
+</table>
+"""
+
+_POST_HTML_EXPERIMENT = """
+<table id="post102">
+  <tr><td class="thead">25-05-2026, 11:00</td></tr>
+  <tr><td>
+    <div id="postmenu_102"><a>SomeUser</a></div>
+    <div id="post_message_102">Over dit experiment</div>
+  </td></tr>
 </table>
 """
 
@@ -58,10 +75,18 @@ def _session_for_thread_list(logged_in=True):
             return _POST_HTML_F9
         if "goto=newpost" in url and "t=201" in url:
             return _POST_HTML_F40
+        if "goto=newpost" in url and "t=23585" in url:
+            return _POST_HTML_EXPERIMENT
         return ""
 
     session.get.side_effect = _get
     return session
+
+
+def test_fetch_new_posts_filters_excluded_threads():
+    session = _session_for_thread_list()
+    posts = fetch_new_posts(session)
+    assert all(p["thread_id"] != 23585 for p in posts)
 
 
 def test_fetch_new_posts_filters_excluded_forums():
@@ -101,13 +126,14 @@ def test_fetch_new_posts_reauths_on_expired_session():
 
 def test_parse_new_thread_list():
     threads = parse_new_thread_list(_THREAD_LIST_HTML)
-    assert len(threads) == 2
+    assert len(threads) == 3
     assert threads[0]["thread_id"] == 200
     assert threads[0]["thread_title"] == "Testthread"
     assert threads[0]["forum_id"] == 9
     assert threads[0]["forum_name"] == "Zwam"
     assert threads[1]["thread_id"] == 201
     assert threads[1]["forum_id"] == 40
+    assert threads[2]["thread_id"] == 23585
 
 
 def test_parse_new_thread_list_empty():

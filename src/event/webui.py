@@ -169,6 +169,13 @@ def _do_approve(conn, entry: dict, alter_password: str, live_mode: bool, profile
         now = datetime.now(timezone.utc)
         db.increment_rate(conn, entry["alter_username"],
                           now.strftime("%Y-%m-%dT%H"), now.strftime("%Y-%m-%d"))
+        forum_url = os.getenv("FORUM_URL", "").rstrip("/")
+        thread_url = f"{forum_url}/showthread.php?t={entry['thread_id']}"
+        mode_label = "GEPLAATST" if live_mode else "SIMULATIE"
+        logging.info(
+            "[%s] %s → %s\n%s",
+            mode_label, entry["alter_username"], thread_url, entry["reply_text"],
+        )
         if live_mode:
             time.sleep(random.uniform(60, 180))
     return success
