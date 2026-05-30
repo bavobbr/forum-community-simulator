@@ -1,6 +1,7 @@
 import hashlib
 import os
 import re
+import urllib.parse
 import requests
 from dotenv import load_dotenv
 
@@ -8,6 +9,16 @@ load_dotenv()
 
 _TOKEN_RE = re.compile(r"SECURITYTOKEN\s*=\s*['\"]([^'\"]+)['\"]")
 _TIMEOUT = 30
+
+
+def _urlencode_latin1(data: dict) -> bytes:
+    """Encode form data as ISO-8859-1, matching what browsers do for Latin-1 pages."""
+    parts = []
+    for key, val in data.items():
+        k = urllib.parse.quote(str(key).encode("latin-1", errors="replace"))
+        v = urllib.parse.quote(str(val).encode("latin-1", errors="replace"))
+        parts.append(f"{k}={v}")
+    return "&".join(parts).encode("ascii")
 
 
 class VBulletinSession:
@@ -57,7 +68,8 @@ class VBulletinSession:
     def post(self, path: str, data: dict) -> str:
         resp = self.session.post(
             f"{self.base_url}/{path.lstrip('/')}",
-            data=data,
+            data=_urlencode_latin1(data),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
             allow_redirects=True,
             timeout=_TIMEOUT,
         )
