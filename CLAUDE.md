@@ -141,7 +141,7 @@ Rich markup escaping (`rich.markup.escape`) is applied to all LLM-generated text
 - All HTTP requests have a 30-second timeout (`_TIMEOUT = 30` in `session.py`); `requests.exceptions.Timeout` propagates up and is caught as a generic `Exception` by the enrichment handler.
 - Members-only forums (Zwam, f=9) require authentication to access
 - Excluded forums: Discretie (f=40), Shrimp Refuge HQ (f=20), Forum Games (f=42), Donations (f=29)
-- Scanning account: `wokebot` / `wokebot123` (forum scanning only, not an alter ego)
+- Scanning account: `wokebot`(forum scanning only, not an alter ego)
 - **New-post polling** uses `search.php?do=getdaily` (last 24h, stateless — not consumed by checking). Flow: `getdaily` → 302 redirect → `search.php?searchid=X` (thread list) → re-fetch with `&pp=100` for up to 100 threads → for each thread: `showthread.php?goto=newpost&t={id}` (redirects to the page with the newest unread post) → `parse_thread_page()`. Post dicts gain `thread_id`, `thread_title`, `forum_id`, `forum_name` from the thread list row.
 - Date strings from `showthread` pages can be absolute (`DD-MM-YYYY, HH:MM`) or relative (`Today, HH:MM` / `Yesterday, HH:MM`); `parse_post_date()` handles both, treating all times as UTC+2.
 
@@ -151,7 +151,7 @@ Required in `.env` (see `.env.example`):
 ```
 GOOGLE_API_KEY=...
 FORUM_USERNAME=wokebot
-FORUM_PASSWORD=wokebot123
+FORUM_PASSWORD=<pass>
 ALTER_PASSWORD=...        # shared password for all alter ego accounts
 FORUM_URL=...             # base URL of the VBulletin forum (no trailing slash)
 ```
