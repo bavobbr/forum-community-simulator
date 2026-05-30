@@ -77,3 +77,19 @@ def test_generate_replies_appends_afgekapt_on_max_tokens():
     with patch("src.persona.generator.call_llm_raw", return_value=_make_mock_resp("Lang antwoord", "MAX_TOKENS")):
         results = generate_replies(_make_profile(), _TEST_POSTS[:1])
     assert results[0]["reply"] == "Lang antwoord [afgekapt]"
+
+
+def test_build_system_prompt_truncates_examples_to_400_chars():
+    profile = _make_profile()
+    profile.example_posts = ["x" * 1000]
+    prompt = build_system_prompt(profile)
+    assert "x" * 401 not in prompt
+    assert "x" * 400 in prompt
+
+
+def test_build_system_prompt_uses_at_most_10_examples():
+    profile = _make_profile()
+    profile.example_posts = [f"voorbeeld {i}" for i in range(25)]
+    prompt = build_system_prompt(profile)
+    assert "voorbeeld 10" not in prompt
+    assert "voorbeeld 9" in prompt

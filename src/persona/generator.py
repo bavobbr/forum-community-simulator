@@ -4,7 +4,7 @@ from src.persona.models import PersonaProfile
 
 
 def build_system_prompt(profile: PersonaProfile) -> str:
-    examples = "\n".join(f"- {p}" for p in profile.example_posts[:20])
+    examples = "\n".join(f"- {p[:400]}" for p in profile.example_posts[:10])
     dialect = ", ".join(profile.dialect_markers) if profile.dialect_markers else "geen specifieke markers"
     opinions = "\n".join(f"- {o}" for o in profile.opinion_fingerprint) if profile.opinion_fingerprint else "- (geen)"
     patterns = "\n".join(f"- {p}" for p in profile.rhetorical_patterns) if profile.rhetorical_patterns else "- (geen)"

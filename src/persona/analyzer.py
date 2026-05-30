@@ -3,6 +3,16 @@ import re
 from src.llm import call_llm
 from src.persona.models import PersonaProfile
 
+
+def _select_examples(posts: list[dict], n: int = 10, max_chars: int = 400) -> list[str]:
+    """Pick n representative posts from the post list, each capped at max_chars."""
+    candidates = [p for p in posts if len(p.get("content", "")) > 20]
+    if not candidates:
+        return []
+    step = max(1, len(candidates) // n)
+    selected = candidates[::step][:n]
+    return [p["content"][:max_chars] for p in selected]
+
 _SYSTEM = (
     "Je bent een expert in het analyseren van online forum gedrag van Nederlandstalige gebruikers. "
     "Je analyseert berichten en geeft je antwoord altijd als geldig JSON object, zonder uitleg of markdown."
@@ -21,7 +31,6 @@ _SCHEMA_DESCRIPTION = """{
   "typical_post_length": gemiddeld_aantal_woorden_per_bericht_als_int,
   "daily_cap": gemiddeld_posts_per_dag_als_int,
   "hourly_cap": max_posts_per_uur_als_int,
-  "example_posts": ["verbatim post 1", "verbatim post 2", ...],
   "persona_summary": "Uitgebreide beschrijving van de persoonlijkheid in 6-10 zinnen: schrijfstijl, humor, typische onderwerpen, hoe ze reageren op anderen, en wat ze onderscheidt van andere forumleden.",
   "worldview": "Beschrijving in 3-5 zinnen van hoe deze persoon de wereld ziet: kernwaarden, algemene levensvisie, houding tegenover technologie/politiek/maatschappij, en hoe ze redeneren over onbekende onderwerpen.",
   "rhetorical_patterns": ["Patroon 1: hoe ze een discussie openen of reageren", "Patroon 2: hoe ze hun mening onderbouwen", "Patroon 3: hoe ze omgaan met tegenargumenten", ...],
@@ -65,7 +74,6 @@ def _apply_analysis(profile: PersonaProfile, data: dict) -> None:
     profile.typical_post_length = data.get("typical_post_length", profile.typical_post_length)
     profile.daily_cap = data.get("daily_cap", profile.daily_cap)
     profile.hourly_cap = data.get("hourly_cap", profile.hourly_cap)
-    profile.example_posts = data.get("example_posts", profile.example_posts)
     profile.persona_summary = data.get("persona_summary", profile.persona_summary)
     profile.worldview = data.get("worldview", profile.worldview)
     profile.rhetorical_patterns = data.get("rhetorical_patterns", profile.rhetorical_patterns)
@@ -81,7 +89,6 @@ def analyze_first_batch(alter: dict, posts: list[dict]) -> PersonaProfile:
         f'"{alter["original_username"]}" (user_id: {alter["user_id"]}, totaal {alter["post_count"]} posts op het forum).\n\n'
         f"Berichten:\n{posts_text}\n\n"
         f"Geef een JSON object terug met dit schema:\n{_SCHEMA_DESCRIPTION}\n\n"
-        f"Kies maximaal 20 representatieve verbatim posts als example_posts. "
         f"Beperk opinion_fingerprint tot maximaal 25 items — maak ze concreet en bruikbaar als debatpunten. "
         f"Geef enkel het JSON object terug, geen uitleg."
     )
@@ -92,6 +99,7 @@ def analyze_first_batch(alter: dict, posts: list[dict]) -> PersonaProfile:
     if data:
         _apply_analysis(profile, data)
         profile.posts_analyzed = len(posts)
+        profile.example_posts = _select_examples(posts)
     else:
         hint = "response afgekapt (te kort venster?)" if text.strip().startswith("{") else "geen JSON gevonden"
         raise ValueError(f"Gemini response kon niet als JSON worden geparsed ({hint}). Ruwe respons:\n{text[:500]}")
@@ -103,7 +111,6 @@ _REFINE_SCHEMA = """{
   "new_dialect_markers": ["nieuwe woorden niet al in het bestaande profiel"],
   "new_opinion_fingerprint": ["nieuwe standpunten niet al in het bestaande profiel"],
   "topic_weights_update": {"forumnaam": gewicht_0_tot_1},
-  "new_example_posts": ["maximaal 5 verbatim posts die representatiever zijn dan de bestaande"],
   "frequent_interactions_update": {"username": "ally | rival | neutral"},
   "persona_summary": "Herziene beschrijving als de nieuwe berichten dat rechtvaardigen, anders lege string.",
   "worldview": "Herziene worldview als de nieuwe berichten dat rechtvaardigen, anders lege string.",
@@ -121,9 +128,6 @@ def _merge_refine(profile: PersonaProfile, data: dict) -> None:
     profile.opinion_fingerprint = (profile.opinion_fingerprint + new_opinions)[:25]
 
     profile.topic_weights.update(data.get("topic_weights_update", {}))
-
-    new_examples = data.get("new_example_posts", [])
-    profile.example_posts = (profile.example_posts + new_examples)[:20]
 
     profile.frequent_interactions.update(data.get("frequent_interactions_update", {}))
 
@@ -174,6 +178,9 @@ def refine_with_batch(profile: PersonaProfile, posts: list[dict]) -> PersonaProf
         _merge_refine(profile, data)
         profile.posts_analyzed += len(posts)
         profile.pages_loaded += 1
+        if len(profile.example_posts) < 10:
+            needed = 10 - len(profile.example_posts)
+            profile.example_posts += _select_examples(posts, n=needed)
     else:
         hint = "response afgekapt (te kort venster?)" if text.strip().startswith("{") else "geen JSON gevonden"
         raise ValueError(f"Gemini response kon niet als JSON worden geparsed ({hint}). Ruwe respons:\n{text[:500]}")

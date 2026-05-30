@@ -2,7 +2,7 @@ import json
 import pytest
 from unittest.mock import patch
 from src.persona.models import PersonaProfile
-from src.persona.analyzer import analyze_first_batch, refine_with_batch
+from src.persona.analyzer import analyze_first_batch, refine_with_batch, _select_examples
 
 _SAMPLE_POSTS = [
     {
@@ -141,3 +141,85 @@ def test_refine_includes_existing_tags_in_prompt():
         refine_with_batch(existing, _SAMPLE_POSTS)
     _, user_prompt, _ = mock_llm.call_args[0]
     assert "wielrennen" in user_prompt
+
+
+# --- _select_examples ---
+
+_LONG_POSTS = [
+    {"post_id": i, "thread_id": 1, "thread_title": "Zwam talk", "forum_id": 9,
+     "forum_name": "Zwam", "date": "01-01-2024, 10:00", "quoted_users": [],
+     "content": f"post nummer {i} " * 30}
+    for i in range(1, 21)
+]
+_SHORT_POST = {"post_id": 99, "forum_name": "Zwam", "content": "ok"}
+
+
+def test_select_examples_returns_up_to_n():
+    result = _select_examples(_LONG_POSTS, n=5)
+    assert len(result) == 5
+
+
+def test_select_examples_returns_all_when_fewer_than_n():
+    result = _select_examples(_LONG_POSTS[:3], n=10)
+    assert len(result) == 3
+
+
+def test_select_examples_filters_posts_shorter_than_20_chars():
+    result = _select_examples([_SHORT_POST], n=10)
+    assert result == []
+
+
+def test_select_examples_truncates_content_to_max_chars():
+    long = [{"post_id": 1, "forum_name": "Zwam", "content": "x" * 1000}]
+    result = _select_examples(long, n=1, max_chars=400)
+    assert result == ["x" * 400]
+
+
+def test_select_examples_returns_empty_for_empty_input():
+    assert _select_examples([], n=10) == []
+
+
+def test_select_examples_spreads_across_posts():
+    posts = [{"post_id": i, "forum_name": "Zwam", "content": f"bericht {i} " * 10} for i in range(1, 101)]
+    result = _select_examples(posts, n=10)
+    ids = [int(r.split()[1]) for r in result]
+    assert max(ids) - min(ids) > 50  # spread across the 100 posts
+
+
+# --- example_posts no longer come from Gemini ---
+
+def test_analyze_first_batch_example_posts_come_from_posts_not_gemini():
+    response = dict(_MOCK_ANALYSIS_RESPONSE)
+    response["example_posts"] = ["GEMINI FABRICATED THIS"]
+    with patch("src.persona.analyzer.call_llm", return_value=json.dumps(response)):
+        profile = analyze_first_batch(_ALTER, _SAMPLE_POSTS)
+    assert "GEMINI FABRICATED THIS" not in profile.example_posts
+    assert any("mewgenics" in ex for ex in profile.example_posts)
+
+
+def test_analyze_first_batch_schema_does_not_request_example_posts():
+    with patch("src.persona.analyzer.call_llm", return_value=json.dumps(_MOCK_ANALYSIS_RESPONSE)) as mock_llm:
+        analyze_first_batch(_ALTER, _SAMPLE_POSTS)
+    _, user_prompt, _ = mock_llm.call_args[0]
+    assert "example_posts" not in user_prompt
+
+
+def test_refine_fills_up_examples_when_profile_has_fewer_than_10():
+    existing = PersonaProfile.from_alter_ego(_ALTER)
+    existing.posts_analyzed = 2
+    existing.pages_loaded = 1
+    existing.example_posts = ["één voorbeeld"]  # only 1
+    with patch("src.persona.analyzer.call_llm", return_value=json.dumps(_MOCK_REFINE_RESPONSE)):
+        updated = refine_with_batch(existing, _LONG_POSTS)
+    assert len(updated.example_posts) > 1
+
+
+def test_refine_does_not_add_examples_when_profile_already_has_10():
+    existing = PersonaProfile.from_alter_ego(_ALTER)
+    existing.posts_analyzed = 200
+    existing.pages_loaded = 1
+    existing.example_posts = [f"voorbeeld {i}" for i in range(10)]
+    with patch("src.persona.analyzer.call_llm", return_value=json.dumps(_MOCK_REFINE_RESPONSE)):
+        updated = refine_with_batch(existing, _LONG_POSTS)
+    assert len(updated.example_posts) == 10
+    assert updated.example_posts[0] == "voorbeeld 0"  # originals preserved
