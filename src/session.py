@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 _TOKEN_RE = re.compile(r"SECURITYTOKEN\s*=\s*['\"]([^'\"]+)['\"]")
+_TIMEOUT = 30
 
 
 class VBulletinSession:
@@ -48,7 +49,7 @@ class VBulletinSession:
         return logged_in
 
     def get(self, path: str) -> str:
-        resp = self.session.get(f"{self.base_url}/{path.lstrip('/')}")
+        resp = self.session.get(f"{self.base_url}/{path.lstrip('/')}", timeout=_TIMEOUT)
         resp.raise_for_status()
         return resp.text
 
@@ -57,6 +58,7 @@ class VBulletinSession:
             f"{self.base_url}/{path.lstrip('/')}",
             data=data,
             allow_redirects=True,
+            timeout=_TIMEOUT,
         )
         resp.raise_for_status()
         return resp.text
