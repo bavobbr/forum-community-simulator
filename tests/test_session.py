@@ -38,19 +38,6 @@ def test_get_raises_on_timeout():
         s.get("slow.php")
 
 
-def test_get_forces_utf8_encoding():
-    s = _make_session()
-    resp = s.session.get.return_value
-    s.get("index.php")
-    assert resp.encoding == "utf-8"
-
-
-def test_post_forces_utf8_encoding():
-    s = _make_session()
-    resp = s.session.post.return_value
-    s.post("login.php", data={})
-    assert resp.encoding == "utf-8"
-
 
 def test_post_encodes_form_data_as_latin1():
     s = _make_session()

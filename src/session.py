@@ -62,7 +62,6 @@ class VBulletinSession:
     def get(self, path: str) -> str:
         resp = self.session.get(f"{self.base_url}/{path.lstrip('/')}", timeout=_TIMEOUT)
         resp.raise_for_status()
-        resp.encoding = "utf-8"
         return resp.text
 
     def post(self, path: str, data: dict) -> str:
@@ -74,5 +73,4 @@ class VBulletinSession:
             timeout=_TIMEOUT,
         )
         resp.raise_for_status()
-        resp.encoding = "utf-8"
         return resp.text
