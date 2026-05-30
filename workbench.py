@@ -1,8 +1,11 @@
 import json
+import logging
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 from rich.console import Console
 

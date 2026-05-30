@@ -304,6 +304,31 @@ def test_fetch_window_calls_enrich_with_full_content():
     scraper._enrich_with_full_content.assert_called_once_with(posts_page)
 
 
+def test_enrich_logs_progress_every_25_posts(caplog):
+    import logging
+    posts = [_make_post(i) for i in range(1, 51)]  # 50 posts
+    session = MagicMock()
+    session.get.return_value = _SHOWTHREAD_HTML
+    scraper = _make_scraper(session)
+    with caplog.at_level(logging.INFO, logger="src.persona.scraper"):
+        scraper._enrich_with_full_content(posts)
+    progress_msgs = [r.message for r in caplog.records if "full content" in r.message]
+    assert any("25/50" in m for m in progress_msgs)
+    assert any("50/50" in m for m in progress_msgs)
+
+
+def test_enrich_logs_final_count_when_not_multiple_of_25(caplog):
+    import logging
+    posts = [_make_post(i) for i in range(1, 11)]  # 10 posts — less than one batch
+    session = MagicMock()
+    session.get.return_value = _SHOWTHREAD_HTML
+    scraper = _make_scraper(session)
+    with caplog.at_level(logging.INFO, logger="src.persona.scraper"):
+        scraper._enrich_with_full_content(posts)
+    progress_msgs = [r.message for r in caplog.records if "full content" in r.message]
+    assert any("10/10" in m for m in progress_msgs)
+
+
 def test_fetch_batch_calls_enrich_with_full_content():
     session = MagicMock()
     posts_page = [_make_post(42)]

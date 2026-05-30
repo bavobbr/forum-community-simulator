@@ -6,6 +6,8 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 from src.session import VBulletinSession
 
+_log = logging.getLogger(__name__)
+
 _POST_ID_PATTERN = re.compile(r"^post(\d+)$")
 _FORUM_ID_PATTERN = re.compile(r"f=(\d+)")
 _THREAD_ID_PATTERN = re.compile(r"t=(\d+)")
@@ -147,18 +149,22 @@ class PostScraper:
     def _enrich_with_full_content(self, posts: list[dict]) -> list[dict]:
         """Replace truncated search-result snippets with full post body from showthread pages."""
         enriched = []
-        for post in posts:
+        total = len(posts)
+        for i, post in enumerate(posts):
             try:
                 html = self.session.get(f"showthread.php?p={post['post_id']}")
                 full = _extract_post_content(html, post["post_id"])
                 if full is not None:
                     enriched.append({**post, "content": full})
                 else:
-                    logging.warning("post %d not found on showthread page, keeping excerpt", post["post_id"])
+                    _log.warning("post %d not found on showthread page, keeping excerpt", post["post_id"])
                     enriched.append(post)
             except Exception as exc:
-                logging.warning("Failed to fetch full content for post %d: %s", post["post_id"], exc)
+                _log.warning("Failed to fetch full content for post %d: %s", post["post_id"], exc)
                 enriched.append(post)
+            n = i + 1
+            if n % 25 == 0 or n == total:
+                _log.info("  full content: %d/%d posts", n, total)
         return enriched
 
     def fetch_batch(self, user_id: int, page: int = 1) -> tuple[list[dict], bool]:
