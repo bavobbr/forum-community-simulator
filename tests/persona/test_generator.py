@@ -93,3 +93,33 @@ def test_build_system_prompt_uses_at_most_10_examples():
     prompt = build_system_prompt(profile)
     assert "voorbeeld 10" not in prompt
     assert "voorbeeld 9" in prompt
+
+
+def test_build_system_prompt_includes_ally_with_warm_tone_instruction():
+    profile = _make_profile()
+    profile.frequent_interactions = {"alice": "ally", "bob": "rival"}
+    prompt = build_system_prompt(profile)
+    assert "alice" in prompt
+    assert "bondgenoot" in prompt
+
+
+def test_build_system_prompt_includes_rival_with_critical_tone_instruction():
+    profile = _make_profile()
+    profile.frequent_interactions = {"bob": "rival"}
+    prompt = build_system_prompt(profile)
+    assert "bob" in prompt
+    assert "rivaal" in prompt
+
+
+def test_build_system_prompt_omits_neutral_from_interactions():
+    profile = _make_profile()
+    profile.frequent_interactions = {"charlie": "neutral"}
+    prompt = build_system_prompt(profile)
+    assert "charlie" not in prompt
+
+
+def test_build_system_prompt_omits_interactions_section_when_empty():
+    profile = _make_profile()
+    profile.frequent_interactions = {}
+    prompt = build_system_prompt(profile)
+    assert "Bekende forumleden" not in prompt

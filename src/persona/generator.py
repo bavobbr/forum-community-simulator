@@ -9,6 +9,22 @@ def build_system_prompt(profile: PersonaProfile) -> str:
     opinions = "\n".join(f"- {o}" for o in profile.opinion_fingerprint) if profile.opinion_fingerprint else "- (geen)"
     patterns = "\n".join(f"- {p}" for p in profile.rhetorical_patterns) if profile.rhetorical_patterns else "- (geen)"
 
+    known = {u: r for u, r in profile.frequent_interactions.items() if r in ("ally", "rival")}
+    if known:
+        tone_lines = []
+        for username, rel in known.items():
+            if rel == "ally":
+                tone_lines.append(f"- {username} (bondgenoot): schrijf warm, open en enthousiast")
+            else:
+                tone_lines.append(f"- {username} (rivaal): wees directer, kritisch of prikkelend — maar altijd in karakter")
+        interactions_section = (
+            f"## Bekende forumleden\n"
+            f"Pas je toon aan als je aan iemand van deze lijst reageert:\n"
+            + "\n".join(tone_lines) + "\n\n"
+        )
+    else:
+        interactions_section = ""
+
     return (
         f"Je speelt de rol van '{profile.original_username}', een voormalig lid van een Nederlandstalig "
         f"gamerforum. Je schrijft ALTIJD in het Nederlands, in het specifieke register van deze persoon.\n\n"
@@ -31,6 +47,7 @@ def build_system_prompt(profile: PersonaProfile) -> str:
         f"- Dialect/spreektaal: {dialect}\n"
         f"- Typische berichtlengte: ~{profile.typical_post_length} woorden\n"
         f"- Interpunctie: {profile.punctuation_style}\n\n"
+        f"{interactions_section}"
         f"## Voorbeeldberichten\n"
         f"{examples}\n\n"
         f"## Regels\n"
