@@ -149,14 +149,16 @@ sequenceDiagram
     participant Gemini as Gemini Pro
     actor Operator
 
-    WB->>Forum: fetch post history (pages 1+2, 200 posts)
-    Forum-->>WB: posts
+    WB->>Forum: fetch post history (pages 1+2, up to 200 posts)
+    Forum-->>WB: post list (search excerpts)
+    WB->>Forum: fetch showthread?p=X per post (full content)
+    Forum-->>WB: full post bodies
 
-    WB->>Gemini: analyze_first_batch(alter, 200 posts)
+    WB->>Gemini: analyze_first_batch(alter, posts)
     Gemini-->>WB: PersonaProfile JSON
 
     loop more post pages available
-        WB->>Forum: fetch next 100 posts
+        WB->>Forum: fetch next 100 posts + full content per post
         Forum-->>WB: posts
         WB->>Gemini: refine_with_batch(profile, posts)
         Gemini-->>WB: updated PersonaProfile

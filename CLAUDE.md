@@ -87,10 +87,19 @@ Key fields for AI context:
 
 ## Persona analyzer (`src/persona/analyzer.py`)
 
-- `analyze_first_batch`: processes all posts fetched by `fetch_all_posts` (full history), max_output_tokens 8192; raises `ValueError` on unparseable JSON
-- `refine_with_batch`: uses a **diff schema** — asks Gemini only for what changed (`new_dialect_markers`, `topic_weights_update`, `worldview`, `new_rhetorical_patterns`, etc.) and merges in Python. Never regenerates the full profile. Max output tokens: 8192
+- `analyze_first_batch`: processes all posts fetched by `fetch_all_posts` (full history), max_output_tokens 8192; raises `ValueError` on unparseable JSON. After the LLM call, calls `_select_examples(posts)` to populate `example_posts` — Gemini is **not** asked to return verbatim posts.
+- `refine_with_batch`: uses a **diff schema** — asks Gemini only for what changed (`new_dialect_markers`, `topic_weights_update`, `worldview`, `new_rhetorical_patterns`, etc.) and merges in Python. Never regenerates the full profile. Max output tokens: 8192. When `profile.example_posts` has fewer than 10 entries, calls `_select_examples(posts, n=needed)` to fill up to 10.
+- `_select_examples(posts, n=10, max_chars=400)`: picks `n` posts in a stride spread across the list, filtering out posts ≤ 20 chars, and truncates each to `max_chars`. Keeps examples in Python without spending Gemini output tokens on verbatim text (frees ~4K tokens per analysis call).
+- `example_posts` and `new_example_posts` are **absent** from both Gemini schemas — the LLM never returns them.
 - `opinion_fingerprint` cap: 25 items (raised from 15)
 - `persona_summary` requested as 6–10 sentences
+
+## Persona generator (`src/persona/generator.py`)
+
+`build_system_prompt(profile)` assembles the system prompt for both workbench sample replies and (via `src/event/generator.py`) live event replies.
+
+- **Example posts**: uses at most 10, each truncated to 400 chars (`profile.example_posts[:10]`; each entry capped at `p[:400]`).
+- **Bekende forumleden section**: built from `profile.frequent_interactions`. Allies get the instruction to write warm, open and enthusiastic; rivals get direct/critical/provocative. Neutral entries are omitted. The entire section is skipped when `frequent_interactions` has no ally or rival entries.
 
 ## Workbench flow (`src/workbench/cli.py`)
 
@@ -107,6 +116,8 @@ Inside a persona, actions are independent:
 The profile summary panel shows `persona_summary`, `worldview`, `opinion_fingerprint` count, `rhetorical_patterns`, writing style, and caps.
 
 Rich markup escaping (`rich.markup.escape`) is applied to all LLM-generated text shown in panels to prevent BBCode tags from being misinterpreted by Rich.
+
+`workbench.py` configures `logging.basicConfig(level=logging.INFO, format="%(message)s")` so progress messages from the scraper (e.g. `full content: 25/200 posts`) are visible during interactive use.
 
 ## Forum scraping facts
 
@@ -125,6 +136,9 @@ Rich markup escaping (`rich.markup.escape`) is applied to all LLM-generated text
 - Last activity date comes from `search.php?do=finduser&u={id}` (not the profile page)
 - Date format on search results: `DD-MM-YYYY, HH:MM` in `<td class="thead">`
 - Forum rate-limits searches: 5s minimum between requests; script uses 6s delay
+- **Full post content enrichment**: after fetching a search results page, `PostScraper._enrich_with_full_content(posts)` fetches `showthread.php?p={post_id}` for every post and replaces the truncated search-result excerpt with the full body parsed by `_extract_post_content(html, post_id)`. No delay between showthread fetches (VBulletin does not rate-limit individual post pages). Falls back to the search excerpt on timeout or parse failure. Progress is logged every 25 posts via `logging.info`.
+- `_extract_post_content` replaces smilie `<img>` tags with `(title)` text, other images with `[afbeelding]`, and returns plain text via `get_text(separator=" ", strip=True)`.
+- All HTTP requests have a 30-second timeout (`_TIMEOUT = 30` in `session.py`); `requests.exceptions.Timeout` propagates up and is caught as a generic `Exception` by the enrichment handler.
 - Members-only forums (Zwam, f=9) require authentication to access
 - Excluded forums: Discretie (f=40), Shrimp Refuge HQ (f=20), Forum Games (f=42), Donations (f=29)
 - Scanning account: `wokebot` / `wokebot123` (forum scanning only, not an alter ego)
