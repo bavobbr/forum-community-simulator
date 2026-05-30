@@ -1,4 +1,5 @@
 import calendar
+import logging
 import re
 import time
 from datetime import datetime
@@ -15,6 +16,25 @@ _SEARCH_ID_PATTERN = re.compile(r"searchid=(\d+)")
 # local time. We parse displayed times as UTC and subtract this buffer to ensure
 # date-window boundaries always overlap rather than miss posts.
 _TZ_BUFFER_SECONDS = 7200
+
+
+def _extract_post_content(html: str, post_id: int) -> str | None:
+    """Extract full post body from a showthread.php?p=X page."""
+    soup = BeautifulSoup(html, "html.parser")
+    msg = soup.find("div", id=f"post_message_{post_id}")
+    if not msg:
+        return None
+    for img in msg.find_all("img"):
+        src = img.get("src", "")
+        title = img.get("title", "")
+        alt = img.get("alt", "")
+        if "smilies" in src:
+            img.replace_with(f"({title})" if title else "")
+        elif alt:
+            img.replace_with(alt)
+        else:
+            img.replace_with("[afbeelding]")
+    return msg.get_text(separator=" ", strip=True)
 
 
 def parse_post_date_timestamp(date_str: str) -> int | None:
@@ -124,6 +144,23 @@ class PostScraper:
             self._search_ids[user_id] = search_id
         return self._search_ids[user_id]
 
+    def _enrich_with_full_content(self, posts: list[dict]) -> list[dict]:
+        """Replace truncated search-result snippets with full post body from showthread pages."""
+        enriched = []
+        for post in posts:
+            try:
+                html = self.session.get(f"showthread.php?p={post['post_id']}")
+                full = _extract_post_content(html, post["post_id"])
+                if full is not None:
+                    enriched.append({**post, "content": full})
+                else:
+                    logging.warning("post %d not found on showthread page, keeping excerpt", post["post_id"])
+                    enriched.append(post)
+            except Exception as exc:
+                logging.warning("Failed to fetch full content for post %d: %s", post["post_id"], exc)
+                enriched.append(post)
+        return enriched
+
     def fetch_batch(self, user_id: int, page: int = 1) -> tuple[list[dict], bool]:
         """Fetch one page (100 posts) of a user's post history. Returns (posts, has_more_pages)."""
         search_id = self._ensure_search_id(user_id)
@@ -131,7 +168,7 @@ class PostScraper:
         html = self.session.get(f"search.php?searchid={search_id}&pp=100&page={page}")
         posts = parse_posts_page(html)
         has_more = parse_has_next_page(html)
-        return posts, has_more
+        return self._enrich_with_full_content(posts), has_more
 
     def _search_advanced(self, username: str, before_ts: int | None = None) -> str:
         """POST an advanced search for a user's posts (newest first).
@@ -209,6 +246,8 @@ class PostScraper:
 
         if not posts:
             return [], None
+
+        posts = self._enrich_with_full_content(posts)
 
         oldest = min(posts, key=lambda p: p["post_id"])
         ts = parse_post_date_timestamp(oldest["date"])

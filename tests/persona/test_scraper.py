@@ -5,6 +5,7 @@ from src.persona.scraper import (
     parse_search_id,
     parse_has_next_page,
     parse_post_date_timestamp,
+    _extract_post_content,
     PostScraper,
 )
 
@@ -206,3 +207,115 @@ def test_fetch_window_raises_when_no_searchid():
         scraper = _make_scraper(session)
         with pytest.raises(ValueError, match="No searchid"):
             scraper.fetch_window("GhostUser")
+
+
+# --- full-content enrichment ---
+
+_SHOWTHREAD_HTML = """
+<table id="post42">
+  <tr><td class="thead">01-01-2024, 10:00</td></tr>
+  <tr><td>
+    <div id="postmenu_42"><a href="#">Alice</a></div>
+    <div id="post_message_42">This is the full untruncated post content.</div>
+  </td></tr>
+</table>
+"""
+
+
+def test_extract_post_content_returns_full_text():
+    content = _extract_post_content(_SHOWTHREAD_HTML, 42)
+    assert content == "This is the full untruncated post content."
+
+
+def test_extract_post_content_returns_none_when_post_not_found():
+    assert _extract_post_content(_SHOWTHREAD_HTML, 99) is None
+
+
+def test_extract_post_content_converts_smilies_to_title():
+    html = '<div id="post_message_1"><img src="smilies/smile.gif" title="Smile" alt=""/> tekst</div>'
+    assert _extract_post_content(html, 1) == "(Smile) tekst"
+
+
+def test_extract_post_content_unknown_image_becomes_afbeelding():
+    html = '<div id="post_message_1"><img src="uploads/photo.jpg" alt=""/></div>'
+    assert _extract_post_content(html, 1) == "[afbeelding]"
+
+
+def test_enrich_replaces_truncated_content():
+    post = {**_make_post(42), "content": "truncated..."}
+    session = MagicMock()
+    session.get.return_value = _SHOWTHREAD_HTML
+    scraper = _make_scraper(session)
+    result = scraper._enrich_with_full_content([post])
+    assert result[0]["content"] == "This is the full untruncated post content."
+
+
+def test_enrich_fetches_showthread_url():
+    session = MagicMock()
+    session.get.return_value = _SHOWTHREAD_HTML
+    scraper = _make_scraper(session)
+    scraper._enrich_with_full_content([_make_post(42)])
+    session.get.assert_called_once_with("showthread.php?p=42")
+
+
+def test_enrich_no_delay_between_fetches():
+    posts = [_make_post(i) for i in range(1, 6)]
+    session = MagicMock()
+    session.get.return_value = _SHOWTHREAD_HTML
+    scraper = _make_scraper(session)
+    with patch("src.persona.scraper.time.sleep") as mock_sleep:
+        scraper._enrich_with_full_content(posts)
+    mock_sleep.assert_not_called()
+
+
+def test_enrich_falls_back_on_missing_post_id():
+    post = {**_make_post(99), "content": "original truncated"}
+    session = MagicMock()
+    session.get.return_value = _SHOWTHREAD_HTML  # only has post 42
+    scraper = _make_scraper(session)
+    result = scraper._enrich_with_full_content([post])
+    assert result[0]["content"] == "original truncated"
+
+
+def test_enrich_falls_back_on_exception():
+    post = {**_make_post(42), "content": "original truncated"}
+    session = MagicMock()
+    session.get.side_effect = Exception("network error")
+    scraper = _make_scraper(session)
+    result = scraper._enrich_with_full_content([post])
+    assert result[0]["content"] == "original truncated"
+
+
+def test_fetch_window_calls_enrich_with_full_content():
+    session = MagicMock()
+    session.security_token = "tok"
+    posts_page = [_make_post(42)]
+
+    with (
+        patch("src.persona.scraper.parse_search_id", return_value="sid1"),
+        patch("src.persona.scraper.parse_posts_page", return_value=posts_page),
+        patch("src.persona.scraper.parse_has_next_page", return_value=False),
+        patch("src.persona.scraper.time.sleep"),
+    ):
+        scraper = _make_scraper(session)
+        scraper._enrich_with_full_content = MagicMock(side_effect=lambda p: p)
+        scraper.fetch_window("TestUser")
+
+    scraper._enrich_with_full_content.assert_called_once_with(posts_page)
+
+
+def test_fetch_batch_calls_enrich_with_full_content():
+    session = MagicMock()
+    posts_page = [_make_post(42)]
+
+    with (
+        patch("src.persona.scraper.parse_posts_page", return_value=posts_page),
+        patch("src.persona.scraper.parse_has_next_page", return_value=False),
+        patch("src.persona.scraper.time.sleep"),
+    ):
+        scraper = _make_scraper(session)
+        scraper._search_ids = {1: "sid1"}
+        scraper._enrich_with_full_content = MagicMock(side_effect=lambda p: p)
+        scraper.fetch_batch(1, page=1)
+
+    scraper._enrich_with_full_content.assert_called_once_with(posts_page)
