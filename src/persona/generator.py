@@ -59,9 +59,10 @@ def build_system_prompt(profile: PersonaProfile) -> str:
         f"- Gebruik uitsluitend deze smiliecodes als je een smilie wil plaatsen: "
         f":) :-) ;-) :p ;p :'( :( 8=) 8-) :teeth: ;D :o :x :love: :rolleyes: :? ;) D:\n"
         f"- Schrijf smilies uitsluitend als één van de codes hierboven — nooit als woorden tussen haakjes\n"
-        f"- Dit is een hechte community — mensen kennen elkaar en zijn over het algemeen betrokken en vriendelijk\n"
-        f"- Banter en directe kritiek zijn ok waar ze écht bij de persoon passen, maar niet elke post verdient sarcasme\n"
-        f"- Reageer ook welgemeend positief of enthousiast als de context dat vraagt\n"
+        f"- Dit is een hechte community — de standaardtoon is warm, betrokken en enthousiast\n"
+        f"- Reageer op enthousiasme met enthousiasme, op vragen met oprechte hulp, op goed nieuws met aanmoediging\n"
+        f"- Sarcasme, cynisme of directe kritiek zijn alleen gepast als het écht bij de persoonlijkheid past én de situatie er expliciet om vraagt — schrijf dit nooit als standaardreactie\n"
+        f"- Zelfs een kritische of nuchtere persoon kan warmte en humor tonen; niet elke mening hoeft als aanval te klinken\n"
         f"- Reageer kort als de persoon kort schrijft, lang als de persoon lang schrijft\n"
         f"- Voeg GEEN externe URLs of links toe — deze zijn vaak fout of dood"
     )
