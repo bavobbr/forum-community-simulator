@@ -39,7 +39,7 @@ def _is_image_only(content: str) -> bool:
 
 def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
                auto_approve_minutes, replies_per_cycle,
-               sandbox_thread_ids: set[int] = frozenset(),
+               sandbox_thread_ids: frozenset[int] | set[int] = frozenset(),
                replies_per_post: int = 3):
     try:
         if sandbox_thread_ids:
@@ -176,6 +176,8 @@ def main():
     if sandbox_thread_ids:
         logging.info("SANDBOX MODE: watching threads %s", sandbox_thread_ids)
     else:
+        if sandbox_raw:
+            logging.warning("All SANDBOX_THREAD_IDS were excluded — falling back to FORUM-WIDE MODE")
         logging.info("FORUM-WIDE MODE")
     alter_password = os.getenv("ALTER_PASSWORD")
 
