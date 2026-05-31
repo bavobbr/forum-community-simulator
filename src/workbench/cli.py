@@ -108,7 +108,7 @@ def _rate_samples(console: Console, samples: list[dict]) -> list[dict]:
     return rated
 
 
-_INITIAL_BATCHES = 3  # fetched automatically on first visit
+_INITIAL_BATCHES = 4  # ~750-800 posts fetched and sent to LLM in one shot
 
 
 def _fetch_and_analyze(
@@ -117,42 +117,91 @@ def _fetch_and_analyze(
     scraper: PostScraper,
     profile: PersonaProfile,
 ) -> None:
-    n_batches = _INITIAL_BATCHES if profile.pages_loaded == 0 else 1
+    if profile.pages_loaded == 0:
+        _initial_fetch_and_analyze(console, alter, scraper, profile)
+    else:
+        _incremental_fetch_and_analyze(console, alter, scraper, profile)
 
-    for batch_i in range(n_batches):
-        is_first = profile.pages_loaded == 0
-        before_ts = profile.oldest_post_ts if profile.oldest_post_ts > 0 else None
 
-        if n_batches > 1:
-            console.print(f"\n[bold]Batch {batch_i + 1}/{n_batches} laden...[/bold]")
-        else:
-            label = "meest recente berichten" if before_ts is None else f"berichten vóór batch {profile.pages_loaded}"
-            console.print(f"\n[bold]Batch laden ({label})...[/bold]")
+def _initial_fetch_and_analyze(
+    console: Console,
+    alter: dict,
+    scraper: PostScraper,
+    profile: PersonaProfile,
+) -> None:
+    """Fetch all initial batches, combine, and analyze in one LLM call."""
+    all_posts: list[dict] = []
+    oldest_ts: int | None = None
+    seen_ids: set[int] = set()
 
+    for batch_i in range(_INITIAL_BATCHES):
+        before_ts = oldest_ts if oldest_ts else None
+        console.print(f"\n[bold]Batch {batch_i + 1}/{_INITIAL_BATCHES} laden...[/bold]")
         try:
             posts, oldest_ts = scraper.fetch_window(alter["original_username"], before_ts=before_ts)
         except Exception as exc:
             console.print(f"[red]Scrape mislukt: {exc}[/red]")
-            return
+            if not all_posts:
+                return
+            break
+
+        new_posts = [p for p in posts if p["post_id"] not in seen_ids]
+        seen_ids.update(p["post_id"] for p in new_posts)
+        all_posts.extend(new_posts)
+        console.print(f"  {len(new_posts)} nieuwe posts ({len(all_posts)} totaal)")
 
         if not posts:
             console.print("[yellow]Geen verdere posts gevonden.[/yellow]")
-            return
+            break
 
-        console.print(f"  {len(posts)} posts opgehaald. Analyseren met Gemini...")
-        try:
-            if is_first:
-                new_profile = analyze_first_batch(alter, posts)
-            else:
-                new_profile = refine_with_batch(profile, posts)
-        except ValueError as exc:
-            console.print(f"[red]Analyse mislukt: {exc}[/red]")
-            return
+    if not all_posts:
+        return
 
-        new_profile.pages_loaded = profile.pages_loaded + 1
-        new_profile.oldest_post_ts = oldest_ts or 0
-        profile.__dict__.update(new_profile.__dict__)
-        _save_profile(profile)
+    console.print(f"\n[bold]{len(all_posts)} posts versturen naar Gemini...[/bold]")
+    try:
+        new_profile = analyze_first_batch(alter, all_posts)
+    except ValueError as exc:
+        console.print(f"[red]Analyse mislukt: {exc}[/red]")
+        return
+
+    new_profile.pages_loaded = _INITIAL_BATCHES
+    new_profile.oldest_post_ts = oldest_ts or 0
+    profile.__dict__.update(new_profile.__dict__)
+    _save_profile(profile)
+
+
+def _incremental_fetch_and_analyze(
+    console: Console,
+    alter: dict,
+    scraper: PostScraper,
+    profile: PersonaProfile,
+) -> None:
+    """Fetch one more batch and refine the existing profile."""
+    before_ts = profile.oldest_post_ts if profile.oldest_post_ts > 0 else None
+    label = f"berichten vóór batch {profile.pages_loaded}"
+    console.print(f"\n[bold]Batch laden ({label})...[/bold]")
+
+    try:
+        posts, oldest_ts = scraper.fetch_window(alter["original_username"], before_ts=before_ts)
+    except Exception as exc:
+        console.print(f"[red]Scrape mislukt: {exc}[/red]")
+        return
+
+    if not posts:
+        console.print("[yellow]Geen verdere posts gevonden.[/yellow]")
+        return
+
+    console.print(f"  {len(posts)} posts opgehaald. Verfijnen met Gemini...")
+    try:
+        new_profile = refine_with_batch(profile, posts)
+    except ValueError as exc:
+        console.print(f"[red]Analyse mislukt: {exc}[/red]")
+        return
+
+    new_profile.pages_loaded = profile.pages_loaded + 1
+    new_profile.oldest_post_ts = oldest_ts or 0
+    profile.__dict__.update(new_profile.__dict__)
+    _save_profile(profile)
 
 
 def _run_persona_workbench(
