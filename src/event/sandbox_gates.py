@@ -1,5 +1,4 @@
 import random
-import logging
 import sqlite3
 
 from src.persona.models import PersonaProfile
