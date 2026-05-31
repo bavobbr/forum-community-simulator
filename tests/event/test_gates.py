@@ -1,7 +1,7 @@
 import sqlite3
 import pytest
 from src.event.db import init_db, increment_rate
-from src.event.gates import evaluate_post, detect_quoted_alters
+from src.event.gates import evaluate_post, detect_quoted_alters, _passes_rate_cap
 from src.persona.models import PersonaProfile
 
 
@@ -238,3 +238,19 @@ def test_alter_authored_post_is_skipped(conn):
     post["author"] = "ejdar"  # authored by an alter ego
     result = evaluate_post(post, [profile_a, profile_b], conn)
     assert result == []
+
+
+def test_passes_rate_cap_true_when_under_limits(conn):
+    profile = _make_profile(hourly_cap=3, daily_cap=10)
+    assert _passes_rate_cap(profile, conn) is True
+
+
+def test_passes_rate_cap_false_when_hourly_limit_reached(conn):
+    from datetime import datetime, timezone
+    profile = _make_profile(hourly_cap=2)
+    now = datetime.now(timezone.utc)
+    hour_key = now.strftime("%Y-%m-%dT%H")
+    day_key = now.strftime("%Y-%m-%d")
+    increment_rate(conn, "ejdar", hour_key, day_key)
+    increment_rate(conn, "ejdar", hour_key, day_key)
+    assert _passes_rate_cap(profile, conn) is False

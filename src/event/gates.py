@@ -14,6 +14,15 @@ _BBCODE_QUOTE_RE = re.compile(r"\[QUOTE[^\]]*\].*?\[/QUOTE\]", re.IGNORECASE | r
 _BBCODE_TAG_RE = re.compile(r"\[[^\]]*\]")
 
 
+def _passes_rate_cap(profile: PersonaProfile, conn) -> bool:
+    now = datetime.now(timezone.utc)
+    hour_key = now.strftime("%Y-%m-%dT%H")
+    cutoff_hour_key = (now - timedelta(hours=24)).strftime("%Y-%m-%dT%H")
+    hourly = db.get_hourly_count(conn, profile.reversed_username, hour_key)
+    daily = db.get_daily_count(conn, profile.reversed_username, cutoff_hour_key)
+    return hourly < profile.hourly_cap and daily < profile.daily_cap
+
+
 def detect_quoted_alters(post: dict, profiles: list[PersonaProfile]) -> set[str]:
     all_reversed = {p.reversed_username for p in profiles}
     if post.get("author", "") in all_reversed:
@@ -48,9 +57,6 @@ def evaluate_post(
     if len(stripped.split()) < _MIN_CONTENT_WORDS:
         return []
 
-    now = datetime.now(timezone.utc)
-    hour_key = now.strftime("%Y-%m-%dT%H")
-    cutoff_hour_key = (now - timedelta(hours=24)).strftime("%Y-%m-%dT%H")
     forum_name = post.get("forum_name", "")
     content = post.get("content", "")
 
@@ -72,9 +78,7 @@ def evaluate_post(
             else:
                 weight = profile.topic_weights.get(forum_name, 1.0)
 
-        hourly = db.get_hourly_count(conn, profile.reversed_username, hour_key)
-        daily = db.get_daily_count(conn, profile.reversed_username, cutoff_hour_key)
-        if hourly >= profile.hourly_cap or daily >= profile.daily_cap:
+        if not _passes_rate_cap(profile, conn):
             logging.debug("Rate limit hit for %s", profile.reversed_username)
             continue
 
