@@ -134,3 +134,23 @@ def parse_post_date(date_str: str) -> datetime | None:
         return dt.replace(tzinfo=tz)
     except (ValueError, AttributeError):
         return None
+
+
+def fetch_sandbox_posts(session, thread_ids: set[int]) -> list[dict]:
+    """Fetch current posts from a fixed set of sandbox threads."""
+    posts = []
+    for thread_id in thread_ids:
+        try:
+            time.sleep(_FETCH_DELAY)
+            html = session.get(f"showthread.php?goto=newpost&t={thread_id}")
+            thread_posts = parse_thread_page(html)
+            for p in thread_posts:
+                p["thread_id"] = thread_id
+                p["thread_title"] = ""
+                p["forum_id"] = 0
+                p["forum_name"] = ""
+            posts.extend(thread_posts)
+            logging.debug("sandbox thread %d: %d posts", thread_id, len(thread_posts))
+        except Exception as exc:
+            logging.warning("Failed to fetch sandbox thread %d: %s", thread_id, exc)
+    return posts

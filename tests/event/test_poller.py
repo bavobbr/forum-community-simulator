@@ -1,5 +1,5 @@
 from unittest.mock import MagicMock
-from src.event.poller import fetch_new_posts, parse_post_date, parse_new_thread_list
+from src.event.poller import fetch_new_posts, parse_post_date, parse_new_thread_list, fetch_sandbox_posts
 from datetime import datetime, timezone, timedelta
 
 
@@ -171,3 +171,28 @@ def test_parse_post_date_yesterday():
 def test_parse_post_date_invalid():
     assert parse_post_date("") is None
     assert parse_post_date("baddate") is None
+
+
+def test_fetch_sandbox_posts_returns_posts_for_watched_thread():
+    session = MagicMock()
+    session.get.return_value = _POST_HTML_F9
+    posts = fetch_sandbox_posts(session, {200})
+    assert len(posts) == 1
+    assert posts[0]["post_id"] == 100
+    assert posts[0]["thread_id"] == 200
+    assert posts[0]["forum_id"] == 0
+    assert posts[0]["forum_name"] == ""
+
+
+def test_fetch_sandbox_posts_skips_failed_thread():
+    session = MagicMock()
+    session.get.side_effect = Exception("network error")
+    posts = fetch_sandbox_posts(session, {200})
+    assert posts == []
+
+
+def test_fetch_sandbox_posts_combines_multiple_threads():
+    session = MagicMock()
+    session.get.return_value = _POST_HTML_F9
+    posts = fetch_sandbox_posts(session, {200, 201})
+    assert len(posts) == 2
