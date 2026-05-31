@@ -254,3 +254,13 @@ def test_passes_rate_cap_false_when_hourly_limit_reached(conn):
     increment_rate(conn, "ejdar", hour_key, day_key)
     increment_rate(conn, "ejdar", hour_key, day_key)
     assert _passes_rate_cap(profile, conn) is False
+
+
+def test_passes_rate_cap_false_when_daily_limit_reached(conn):
+    from datetime import datetime, timezone
+    profile = _make_profile(hourly_cap=10, daily_cap=1)
+    now = datetime.now(timezone.utc)
+    hour_key = now.strftime("%Y-%m-%dT%H")
+    day_key = now.strftime("%Y-%m-%d")
+    increment_rate(conn, "ejdar", hour_key, day_key)
+    assert _passes_rate_cap(profile, conn) is False
