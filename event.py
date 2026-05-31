@@ -11,7 +11,8 @@ load_dotenv()
 
 from src.event import db, gates, thread_scraper
 from src.event import generator as event_generator
-from src.event.poller import fetch_new_posts, parse_post_date
+from src.event.poller import fetch_new_posts, fetch_sandbox_posts, parse_post_date
+from src.event import sandbox_gates
 from src.event.webui import create_app, _do_approve
 from src.persona.models import PersonaProfile
 from src.session import VBulletinSession
@@ -37,9 +38,14 @@ def _is_image_only(content: str) -> bool:
 
 
 def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
-               auto_approve_minutes, replies_per_cycle):
+               auto_approve_minutes, replies_per_cycle,
+               sandbox_thread_ids: set[int] | None = None,
+               replies_per_post: int = 3):
     try:
-        new_posts = fetch_new_posts(scanner)
+        if sandbox_thread_ids:
+            new_posts = fetch_sandbox_posts(scanner, sandbox_thread_ids)
+        else:
+            new_posts = fetch_new_posts(scanner)
     except Exception as exc:
         logging.error("Poll failed: %s", exc)
         return
@@ -62,27 +68,39 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
         if _is_image_only(post.get("content", "")):
             continue
 
-        post["quoted_alters"] = gates.detect_quoted_alters(post, profiles)
-        for profile, weight in gates.evaluate_post(post, profiles, conn):
-            candidates.append((post, profile, weight))
+        if sandbox_thread_ids:
+            for profile, weight in sandbox_gates.evaluate_post_sandbox(
+                post, profiles, conn, replies_per_post
+            ):
+                candidates.append((post, profile, weight))
+        else:
+            post["quoted_alters"] = gates.detect_quoted_alters(post, profiles)
+            for profile, weight in gates.evaluate_post(post, profiles, conn):
+                candidates.append((post, profile, weight))
 
-    # Phase 2: pick the top N most relevant candidates for this cycle
-    # Skip duplicate (alter, thread) pairs — one reply per alter per thread per cycle
-    candidates.sort(key=lambda x: x[2], reverse=True)
-    selected: list[tuple[dict, PersonaProfile, float]] = []
-    seen_alter_thread: set[tuple[str, int]] = set()
-    for post, profile, weight in candidates:
-        key = (profile.reversed_username, post["thread_id"])
-        if key in seen_alter_thread:
-            continue
-        seen_alter_thread.add(key)
-        selected.append((post, profile, weight))
-        if len(selected) >= replies_per_cycle:
-            break
-    logging.info(
-        "Cycle: %d new posts, %d candidates, %d selected (cap=%d)",
-        len(evaluated_posts), len(candidates), len(selected), replies_per_cycle,
-    )
+    # Phase 2: in forum-wide mode, cap by cycle limit; in sandbox mode, use all candidates
+    if sandbox_thread_ids:
+        selected = candidates
+        logging.info(
+            "Cycle (sandbox): %d new posts, %d selected",
+            len(evaluated_posts), len(selected),
+        )
+    else:
+        candidates.sort(key=lambda x: x[2], reverse=True)
+        selected: list[tuple[dict, PersonaProfile, float]] = []
+        seen_alter_thread: set[tuple[str, int]] = set()
+        for post, profile, weight in candidates:
+            key = (profile.reversed_username, post["thread_id"])
+            if key in seen_alter_thread:
+                continue
+            seen_alter_thread.add(key)
+            selected.append((post, profile, weight))
+            if len(selected) >= replies_per_cycle:
+                break
+        logging.info(
+            "Cycle: %d new posts, %d candidates, %d selected (cap=%d)",
+            len(evaluated_posts), len(candidates), len(selected), replies_per_cycle,
+        )
 
     # Phase 3: generate and queue replies for selected candidates only
     for post, profile, _ in selected:
@@ -146,6 +164,17 @@ def main():
     poll_interval = int(os.getenv("POLL_INTERVAL", "300"))
     auto_approve_minutes = int(os.getenv("AUTO_APPROVE_MINUTES", "10"))
     replies_per_cycle = int(os.getenv("REPLIES_PER_CYCLE", "3"))
+    sandbox_raw = os.getenv("SANDBOX_THREAD_IDS", "").strip()
+    sandbox_thread_ids: set[int] = (
+        {int(x.strip()) for x in sandbox_raw.split(",") if x.strip()}
+        if sandbox_raw else set()
+    )
+    replies_per_post = int(os.getenv("SANDBOX_REPLIES_PER_POST", "3"))
+
+    if sandbox_thread_ids:
+        logging.info("SANDBOX MODE: watching threads %s", sandbox_thread_ids)
+    else:
+        logging.info("FORUM-WIDE MODE")
     alter_password = os.getenv("ALTER_PASSWORD")
 
     profiles = _load_profiles("personas")
@@ -177,7 +206,9 @@ def main():
         cycle_start = time.time()
 
         _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
-                   auto_approve_minutes, replies_per_cycle)
+                   auto_approve_minutes, replies_per_cycle,
+                   sandbox_thread_ids=sandbox_thread_ids,
+                   replies_per_post=replies_per_post)
 
         for entry in db.get_pending_auto_approve(conn):
             logging.info("Auto-approving reply %d for %s", entry["id"], entry["alter_username"])
