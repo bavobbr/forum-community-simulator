@@ -26,10 +26,11 @@ src/
   workbench/
     cli.py                # Interactive workbench loop (rich TUI)
   event/
-    poller.py             # Fetches new forum posts
+    poller.py             # Fetches new forum posts (forum-wide or sandbox)
     thread_scraper.py     # Fetches thread context for a post
     generator.py          # LLM reply generation for live event
-    gates.py              # Decides which alter egos should respond to a post
+    gates.py              # Decides which alter egos respond (forum-wide mode)
+    sandbox_gates.py      # Decides which alter egos respond (sandbox mode)
     poster.py             # Posts approved replies to the forum
     db.py                 # SQLite (event.db) for pending/seen posts
     webui.py              # Flask approval queue UI
@@ -163,10 +164,16 @@ LOOKBACK_HOURS=48         # ignore posts older than this on startup
 POLL_INTERVAL=300         # seconds between forum polls
 SEARCH_DELAY=6            # seconds between post-history requests
 AUTO_APPROVE_MINUTES=10   # minutes before a queued reply auto-approves
-REPLIES_PER_CYCLE=3       # max replies generated per poll cycle (see algorithm below)
+REPLIES_PER_CYCLE=3       # max replies generated per poll cycle (forum-wide mode only)
+SANDBOX_THREAD_IDS=       # comma-separated thread IDs; if set, activates sandbox mode
+SANDBOX_REPLIES_PER_POST=3 # max random bot replies per unmentioned post (sandbox mode)
 ```
 
 ## Event poll algorithm (`event.py` + `src/event/`)
+
+Two mutually exclusive operating modes, selected at startup by `SANDBOX_THREAD_IDS`:
+
+### Forum-wide mode (default — `SANDBOX_THREAD_IDS` empty)
 
 Each poll cycle (every `POLL_INTERVAL` seconds) runs in four phases:
 
@@ -192,12 +199,29 @@ The cycle cap is the primary anti-spam control: it prevents startup bursts (getd
 
 **Phase 4 — Mark seen.** All posts evaluated in the cycle are written to `seen_posts`, regardless of whether they generated a reply.
 
+### Sandbox mode (`SANDBOX_THREAD_IDS=id1,id2,...`)
+
+Watches a fixed set of threads instead of scanning the whole forum. Intended for a dedicated interaction space where real users can trigger bots directly.
+
+**Phase 1 — Fetch.** `poller.fetch_sandbox_posts(scanner, thread_ids)` fetches `showthread.php?goto=newpost&t={id}` for each watched thread directly (no `getdaily`). Returns the same `list[dict]` format. `forum_id` and `forum_name` are empty/zero (not needed).
+
+**Phase 2 — Evaluate.** Same `LOOKBACK_HOURS` and image-only checks apply. Then `sandbox_gates.evaluate_post_sandbox(post, profiles, conn, replies_per_post)`:
+- Skip if post author is an alter ego (no bot-to-bot replies).
+- Filter to rate-cap-eligible profiles.
+- **Trigger detection**: if any profile's `reversed_username` or `original_username` appears in the post content (case-insensitive), those profiles are "triggered". Up to 3 triggered profiles reply (cap prevents abuse when many bots are mentioned). Triggered-but-rate-capped bots are skipped.
+- **Random fallback**: if no triggers, randomly select up to `SANDBOX_REPLIES_PER_POST` (default 3) eligible profiles.
+- All returned weights are 1.0.
+
+**Phase 3 — Generate (no cycle cap).** All candidates are queued — `REPLIES_PER_CYCLE` does not apply. Generation is the same as forum-wide mode (context fetch + `generate_reply`). Quote-reply path is not used in sandbox mode.
+
+**Phase 4 — Mark seen.** Same as forum-wide.
+
 **Auto-approve loop.** After each poll, `db.get_pending_auto_approve` finds replies whose `auto_approve_at` has passed and calls `_do_approve`. In live mode this calls `poster.post_reply()`, increments `rate_counters`, and sleeps 60–180 s to look human.
 
 ## Testing
 
 ```bash
-pytest                    # run all 106 tests
+pytest                    # run all 187 tests
 pytest tests/test_llm.py  # LLM wrapper tests
 ```
 
@@ -205,12 +229,13 @@ pytest tests/test_llm.py  # LLM wrapper tests
 
 All domain modules patch at the call site: `patch("src.persona.analyzer.call_llm", ...)` etc. Never patch `_client` directly except in `tests/test_llm.py`.
 
-## Current state (2026-05-25)
+## Current state (2026-05-31)
 
-All three plans complete:
+All plans complete:
 1. Account selection — 25 approved alter egos in `config/approved_accounts.json`
 2. Persona workbench — fully functional, uses `gemini-3.1-pro-preview` for analysis, `gemini-3.5-flash` for sample previews
 3. Event orchestrator — fully functional, uses `gemini-3.5-flash`
+4. Sandbox thread mode — implemented; set `SANDBOX_THREAD_IDS` in `.env` to activate
 
 Poller verified end-to-end: `getdaily` → thread list (18 threads) → 245 posts across 17 forums. Cycle cap + individual rate caps confirmed working.
 
