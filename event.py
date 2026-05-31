@@ -11,7 +11,7 @@ load_dotenv()
 
 from src.event import db, gates, thread_scraper
 from src.event import generator as event_generator
-from src.event.poller import fetch_new_posts, fetch_sandbox_posts, parse_post_date
+from src.event.poller import fetch_new_posts, fetch_sandbox_posts, parse_post_date, _EXCLUDED_THREAD_IDS
 from src.event import sandbox_gates
 from src.event.webui import create_app, _do_approve
 from src.persona.models import PersonaProfile
@@ -39,7 +39,7 @@ def _is_image_only(content: str) -> bool:
 
 def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
                auto_approve_minutes, replies_per_cycle,
-               sandbox_thread_ids: set[int] | None = None,
+               sandbox_thread_ids: set[int] = frozenset(),
                replies_per_post: int = 3):
     try:
         if sandbox_thread_ids:
@@ -104,6 +104,7 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
 
     # Phase 3: generate and queue replies for selected candidates only
     for post, profile, _ in selected:
+        # quoted_alters is only populated in forum-wide mode; sandbox always uses the plain reply path
         is_quote_reply = profile.reversed_username in post.get("quoted_alters", set())
 
         if is_quote_reply:
@@ -169,6 +170,7 @@ def main():
         {int(x.strip()) for x in sandbox_raw.split(",") if x.strip()}
         if sandbox_raw else set()
     )
+    sandbox_thread_ids -= _EXCLUDED_THREAD_IDS
     replies_per_post = int(os.getenv("SANDBOX_REPLIES_PER_POST", "3"))
 
     if sandbox_thread_ids:
