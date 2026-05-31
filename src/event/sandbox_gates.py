@@ -1,0 +1,38 @@
+import random
+import logging
+import sqlite3
+
+from src.persona.models import PersonaProfile
+from src.event.gates import _passes_rate_cap
+
+_MAX_TRIGGERED = 3
+
+
+def _find_triggered(post: dict, profiles: list[PersonaProfile]) -> list[PersonaProfile]:
+    content_lower = post.get("content", "").lower()
+    triggered = []
+    for profile in profiles:
+        if (profile.reversed_username.lower() in content_lower
+                or profile.original_username.lower() in content_lower):
+            triggered.append(profile)
+    return triggered
+
+
+def evaluate_post_sandbox(
+    post: dict,
+    profiles: list[PersonaProfile],
+    conn: sqlite3.Connection,
+    replies_per_post: int = 3,
+) -> list[tuple[PersonaProfile, float]]:
+    all_reversed = {p.reversed_username for p in profiles}
+    if post.get("author", "") in all_reversed:
+        return []
+
+    eligible = [p for p in profiles if _passes_rate_cap(p, conn)]
+
+    triggered = _find_triggered(post, eligible)
+    if triggered:
+        return [(p, 1.0) for p in triggered[:_MAX_TRIGGERED]]
+
+    sample = random.sample(eligible, min(replies_per_post, len(eligible)))
+    return [(p, 1.0) for p in sample]
