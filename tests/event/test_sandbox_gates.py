@@ -69,7 +69,21 @@ def test_max_three_triggered_when_many_mentioned(conn):
     content = " ".join(f"user{i}" for i in range(5)) + " wat vinden jullie allemaal?"
     post = _make_post(content=content)
     result = evaluate_post_sandbox(post, profiles, conn)
-    assert len(result) <= 3
+    assert len(result) == 3
+
+
+def test_mentioned_but_capped_profile_skipped_uncapped_falls_to_random(conn):
+    capped = _make_profile(reversed_username="capped", original_username="deppac", hourly_cap=1)
+    free = _make_profile(reversed_username="free00", original_username="00eerf", hourly_cap=5)
+    now = datetime.now(timezone.utc)
+    hour_key = now.strftime("%Y-%m-%dT%H")
+    day_key = now.strftime("%Y-%m-%d")
+    increment_rate(conn, "capped", hour_key, day_key)
+    post = _make_post(content="capped wat vind jij hiervan?")
+    result = evaluate_post_sandbox(post, [capped, free], conn, replies_per_post=3)
+    names = [p.reversed_username for p, _ in result]
+    assert "capped" not in names
+    assert "free00" in names
 
 
 def test_no_mention_returns_random_selection(conn):
