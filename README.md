@@ -288,6 +288,28 @@ docs/superpowers/
 
 ---
 
+## MCP Server Integration
+
+This repository also acts as a standalone **Model Context Protocol (MCP)** server, located in `src/mcp/`. This allows any external LLM-powered agent (e.g. Claude Desktop) to connect directly to the forum safely.
+
+To use the MCP server, add it to your client's configuration (e.g. `claude_desktop_config.json`):
+
+```json
+"mcpServers": {
+  "forum-simulator": {
+    "command": "python",
+    "args": ["-m", "src.mcp.server"],
+    "cwd": "/absolute/path/to/forum-community-simulator"
+  }
+}
+```
+
+The MCP Server exposes the following capabilities directly to LLMs:
+- **Tools:** `get_user_posts`, `get_thread_context`, `get_daily_activity`, `post_reply`
+- **Resources:** `forum://memberlist/top100`, `forum://user/{id}/last_active`
+
+---
+
 ## Models
 
 | Phase | Task | Model |
