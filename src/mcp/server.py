@@ -97,8 +97,8 @@ def get_user_posts(username: str, limit: int = 100, before_ts: int | None = None
         
         os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
         
-        with open(output_filepath, 'w', encoding='utf-8') as f:
-            json.dump(final_obj, f, ensure_ascii=False, indent=2)
+        with open(output_filepath, 'w', encoding='utf-8', errors='replace') as f:
+            json.dump(final_obj, f, ensure_ascii=True, indent=2)
             
         return json.dumps({
             "status": "success",
@@ -221,8 +221,8 @@ def save_approved_persona(username: str, llm_file: str, raw_posts_file: str, use
     safe_name = re.sub(r'[^\w\-]', '_', username)
     save_path = save_dir / f"{safe_name}.json"
     
-    with open(save_path, 'w', encoding='utf-8') as f:
-        json.dump(profile.to_dict(), f, ensure_ascii=False, indent=2)
+    with open(save_path, 'w', encoding='utf-8', errors='replace') as f:
+        json.dump(profile.to_dict(), f, ensure_ascii=True, indent=2)
         
     return f"Success: Fully hydrated persona saved to {save_path}"
 

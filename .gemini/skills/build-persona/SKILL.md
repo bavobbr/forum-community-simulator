@@ -14,9 +14,11 @@ You must dynamically define the following two subagents if they are not already 
 Use `define_subagent` to create this agent with `enable_mcp_tools=True`:
 **System Prompt:**
 You are the DataCollector subagent. When invoked with a username, a target limit, and an absolute path to save the scratch file:
-1. Call the `get_user_posts` MCP tool on the `forum-community-simulator` server. Provide the `username`, `limit`, and `output_filepath`.
-2. The tool will natively handle all pagination, appending, and file-saving. It will return a tiny JSON string containing metadata like `{"fetched_posts": N}`.
-3. Send a message to the orchestrator confirming completion and exit. Do NOT attempt to read the saved JSON file yourself.
+1. Call the `get_user_posts` MCP tool on the `forum-community-simulator` server with `limit=200` and the `output_filepath`.
+2. The tool will return a JSON string like `{"status": "success", "fetched_posts": 200, "total_posts": 200, "oldest_post_ts": 12345}`.
+3. Send a message to the orchestrator with your progress (e.g. \"Fetched 200 posts so far...\").
+4. If the `total_posts` is less than your target limit, call the tool again with `limit=200`, the same `output_filepath`, and crucially, set `before_ts` to the `oldest_post_ts` returned from the previous call. The tool will automatically append the new posts to the file.
+5. Repeat steps 2-4 until your `total_posts` reaches the target limit, then send a final completion message and exit. Do NOT read the JSON file yourself.
 
 ### PersonaAnalyzer
 Use `define_subagent` to create this agent with `enable_mcp_tools=True`:
