@@ -9,7 +9,8 @@ from src.mcp.server import (
     get_daily_activity,
     post_reply,
     get_top_members,
-    get_user_last_active
+    get_user_last_active,
+    save_approved_persona
 )
 
 @pytest.fixture
@@ -26,9 +27,82 @@ def test_get_user_posts(mock_session):
         
         result = get_user_posts(username="accu", limit=1)
         
-        MockScraper.assert_called_once_with(mock_session, delay=6)
+        from unittest.mock import ANY
+        MockScraper.assert_called_once_with(mock_session, delay=6, progress_cb=ANY)
         scraper_instance.fetch_window.assert_called_once_with("accu", before_ts=None)
-        assert json.loads(result) == [{"post_id": 1, "content": "test"}]
+        assert json.loads(result) == {
+            "posts": [{"post_id": 1, "content": "test"}],
+            "oldest_post_ts": 12345
+        }
+
+def test_get_user_posts_with_output_filepath(mock_session, tmp_path):
+    with patch("src.mcp.server.PostScraper") as MockScraper:
+        scraper_instance = MockScraper.return_value
+        # Mock 2 batches to test pagination
+        scraper_instance.fetch_window.side_effect = [
+            ([{"post_id": 2}], 100),
+            ([{"post_id": 1}], 50),
+            ([], None)
+        ]
+        
+        out_file = tmp_path / "scratch.json"
+        
+        result = get_user_posts(username="accu", limit=2, output_filepath=str(out_file))
+        
+        assert scraper_instance.fetch_window.call_count == 2
+        
+        data = json.loads(result)
+        assert data["status"] == "success"
+        assert data["fetched_posts"] == 2
+        assert data["total_posts"] == 2
+        assert data["oldest_post_ts"] == 50
+        
+        with open(out_file, 'r', encoding='utf-8') as f:
+            saved = json.load(f)
+            assert len(saved["posts"]) == 2
+            assert saved["oldest_post_ts"] == 50
+
+def test_save_approved_persona(tmp_path, monkeypatch):
+    # Setup mock files
+    monkeypatch.chdir(tmp_path)
+    
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    approved_file = config_dir / "approved_accounts.json"
+    approved_file.write_text(json.dumps([{
+        "user_id": 42,
+        "original_username": "TestUser",
+        "reversed_username": "resUtseT",
+        "post_count": 100,
+        "last_active": "2026-06-06"
+    }]))
+    
+    llm_file = tmp_path / "llm.json"
+    llm_file.write_text(json.dumps({"dialect_markers": ["test"]}))
+    
+    raw_file = tmp_path / "raw.json"
+    raw_file.write_text(json.dumps({
+        "posts": [{"content": "hello world"}],
+        "oldest_post_ts": 12345
+    }))
+    
+    result = save_approved_persona(
+        username="TestUser", 
+        llm_file=str(llm_file), 
+        raw_posts_file=str(raw_file)
+    )
+    
+    assert "Success" in result
+    
+    saved_file = tmp_path / "agent_personas" / "TestUser.json"
+    assert saved_file.exists()
+    
+    with open(saved_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        assert data["user_id"] == 42
+        assert data["is_approved"] is True
+        assert data["posts_analyzed"] == 1
+        assert data["oldest_post_ts"] == 12345
 
 def test_get_thread_context(mock_session):
     with patch("src.mcp.server.fetch_thread_context") as mock_fetch:
