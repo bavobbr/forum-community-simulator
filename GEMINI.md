@@ -208,6 +208,7 @@ This server allows external AI agents (like Claude Desktop or Cursor) to securel
   - `forum://user/{user_id}/last_active`: Returns the last active date (safely converted from Python `datetime.date` to an ISO string for JSON serialization).
 - **Mutations & Search Actions:**
   - `get_user_posts` wraps `PostScraper.fetch_window` to support paging.
+  - `format_persona_prompt` formats raw JSON posts into the highly constrained Dutch prompt.
   - `get_thread_context` retrieves conversation history.
   - `get_daily_activity` wraps the `getdaily` poller.
   - `post_reply` logs in securely as a specific alter-ego to post live responses.
