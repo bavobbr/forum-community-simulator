@@ -216,6 +216,14 @@ This server allows external AI agents (like Claude Desktop or Cursor) to securel
   - `get_daily_activity` wraps the `getdaily` poller.
   - `post_reply` logs in securely as a specific alter-ego to post live responses.
 
+### RAG Server (`src/mcp/rag_server.py`)
+A secondary MCP server (`forum-rag-mcp`) is available to handle vector database operations for Retrieval-Augmented Generation context using ChromaDB and Gemini Embeddings.
+- **Tools:**
+  - `store_user_posts_in_db`: Embeds and indexes raw scraped JSON posts.
+  - `search_user_posts`: Performs semantic search against historical posts.
+  - `drop_user_posts`: Drops the ChromaDB collection for a user.
+  - `get_user_doc_counts`: Retrieves a summary dictionary of all indexed documents per username.
+
 ---
 
 ## 💡 Guidelines for Future Coding Sessions

@@ -8,6 +8,15 @@
         "src.mcp.server"
       ],
       "env": {}
+    },
+    "forum-rag-mcp": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "-m",
+        "src.mcp.rag_server"
+      ],
+      "env": {}
     }
   }
 }

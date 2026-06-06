@@ -31,3 +31,13 @@ def call_llm_raw(system: str, user: str, max_tokens: int, model: str = MODEL_FLA
         ),
         contents=[user],
     )
+
+def generate_embedding(texts: list[str]) -> list[list[float]]:
+    """Generate embeddings for a list of strings."""
+    if not texts:
+        return []
+    resp = _client.models.embed_content(
+        model="text-embedding-004",
+        contents=texts,
+    )
+    return [e.values for e in resp.embeddings]

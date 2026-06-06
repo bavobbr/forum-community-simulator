@@ -1,6 +1,7 @@
 .env
 config/approved_accounts.json
 config/credentials.json
+config/chroma_db/
 __pycache__/
 *.pyc
 .pytest_cache/

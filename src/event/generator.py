@@ -1,6 +1,7 @@
 from src.llm import call_llm_raw
 from src.persona.models import PersonaProfile
 from src.persona.generator import build_system_prompt
+from src.rag.db import search_posts
 
 
 def generate_reply(
@@ -9,7 +10,8 @@ def generate_reply(
     context_posts: list[dict],
 ) -> str:
     """Generate a reply to triggering_post using context_posts as thread context."""
-    system = build_system_prompt(profile)
+    dynamic_context = search_posts(profile.original_username, triggering_post["content"])
+    system = build_system_prompt(profile, dynamic_context)
 
     context_lines = "\n".join(
         f"{p['author']}: {p['content']}"
@@ -39,7 +41,8 @@ def generate_reply(
 
 def generate_quote_reply(profile: PersonaProfile, triggering_post: dict) -> str:
     """Generate a direct reply to a post that quoted this alter ego. No thread context."""
-    system = build_system_prompt(profile)
+    dynamic_context = search_posts(profile.original_username, triggering_post["content"])
+    system = build_system_prompt(profile, dynamic_context)
 
     user_content = (
         f"Iemand heeft jou geciteerd en reageert direct op jou. Reageer terug op dit specifieke bericht:\n\n"

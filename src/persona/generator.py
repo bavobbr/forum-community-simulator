@@ -3,7 +3,7 @@ from src.llm import call_llm_raw, MODEL_FLASH
 from src.persona.models import PersonaProfile
 
 
-def build_system_prompt(profile: PersonaProfile) -> str:
+def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = None) -> str:
     examples = "\n".join(f"- {p[:400]}" for p in profile.example_posts[:10])
     dialect = ", ".join(profile.dialect_markers) if profile.dialect_markers else "geen specifieke markers"
     opinions = "\n".join(f"- {o}" for o in profile.opinion_fingerprint) if profile.opinion_fingerprint else "- (geen)"
@@ -26,6 +26,15 @@ def build_system_prompt(profile: PersonaProfile) -> str:
         )
     else:
         interactions_section = ""
+
+    dynamic_section = ""
+    if dynamic_context:
+        dynamic_lines = "\n".join(f"- {p['content'][:400]}" for p in dynamic_context)
+        dynamic_section = (
+            f"## Relevante Eerdere Berichten\n"
+            f"Hier zijn enkele van je eerdere berichten over soortgelijke onderwerpen. Gebruik deze als context voor je huidige mening:\n"
+            f"{dynamic_lines}\n\n"
+        )
 
     return (
         f"Je speelt de rol van '{profile.original_username}', een voormalig lid van een Nederlandstalig "
@@ -63,6 +72,7 @@ def build_system_prompt(profile: PersonaProfile) -> str:
         f"- Typische berichtlengte: ~{profile.typical_post_length} woorden\n"
         f"- Interpunctie: {profile.punctuation_style}\n\n"
         f"{interactions_section}"
+        f"{dynamic_section}"
         f"## Voorbeeldberichten\n"
         f"{examples}\n\n"
         f"## Regels\n"

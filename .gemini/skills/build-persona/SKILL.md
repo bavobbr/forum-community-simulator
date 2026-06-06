@@ -18,7 +18,9 @@ You are the DataCollector subagent. When invoked with a username, a target limit
 2. The tool will return a JSON string like `{"status": "success", "fetched_posts": 200, "total_posts": 200, "oldest_post_ts": 12345}`.
 3. Send a message to the orchestrator with your progress (e.g. \"Fetched 200 posts so far...\").
 4. If the `total_posts` is less than your target limit, call the tool again with `limit=200`, the same `output_filepath`, and crucially, set `before_ts` to the `oldest_post_ts` returned from the previous call. The tool will automatically append the new posts to the file.
-5. Repeat steps 2-4 until your `total_posts` reaches the target limit, then send a final completion message and exit. Do NOT read the JSON file yourself.
+5. Repeat steps 2-4 until your `total_posts` reaches the target limit.
+6. Once all posts are collected, call the `store_user_posts_in_db` MCP tool on the `rag_server` (Forum RAG MCP) server, passing the username and the `output_filepath`.
+7. Send a final completion message to the orchestrator and exit. Do NOT read the JSON file yourself.
 
 ### PersonaAnalyzer
 Use `define_subagent` to create this agent with `enable_mcp_tools=True`:

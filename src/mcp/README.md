@@ -25,6 +25,14 @@ To connect the server to an MCP-compatible client like Claude Desktop, add the f
       "src.mcp.server"
     ],
     "cwd": "/path/to/forum-community-simulator"
+  },
+  "forum-rag": {
+    "command": "python",
+    "args": [
+      "-m",
+      "src.mcp.rag_server"
+    ],
+    "cwd": "/path/to/forum-community-simulator"
   }
 }
 ```
@@ -42,3 +50,11 @@ To connect the server to an MCP-compatible client like Claude Desktop, add the f
 
 - **`forum://memberlist/top100`**: Returns the top 100 members from the `memberlist.php` scraper.
 - **`forum://user/{id}/last_active`**: Returns the last active date of a user using the profile scraper.
+
+## RAG Server Tools (`forum-rag-mcp`)
+
+The `rag_server.py` provides an isolated MCP server for Vector Database operations (ChromaDB) to enable Retrieval-Augmented Generation context for personas.
+- **`store_user_posts_in_db(username, filepath)`**: Embeds and indexes raw posts from a JSON scratch file into the user's chroma collection.
+- **`search_user_posts(username, query, limit)`**: Performs a semantic search against the user's historical posts.
+- **`drop_user_posts(username)`**: Deletes the user's chroma collection.
+- **`get_user_doc_counts()`**: Returns a dictionary mapping username to the number of indexed posts.
