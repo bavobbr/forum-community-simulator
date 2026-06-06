@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from mcp.server.fastmcp import FastMCP, Context
 from dotenv import load_dotenv
 
@@ -46,15 +47,17 @@ def get_user_posts(username: str, limit: int = 100, before_ts: int | None = None
     """
     session = get_session()
     
-    def on_progress(current: int, total: int):
-        if ctx:
+    log_filename = f"scrape_{username}_{int(time.time())}.log"
+    
+    def on_progress(post_id: int, current: int, total: int):
+        if ctx and (current % 25 == 0 or current == total):
             ctx.info(f"Scraping {username}: {current}/{total} full posts fetched...")
             if hasattr(ctx, "report_progress"):
                 ctx.report_progress(current, total)
         
         try:
-            with open("scrape_progress.log", "w", encoding="utf-8") as f:
-                f.write(f"Scraping {username}: {current}/{total} posts fetched...\n")
+            with open(log_filename, "a", encoding="utf-8") as f:
+                f.write(f"Read post_id: {post_id}\n")
         except Exception:
             pass
                 

@@ -164,10 +164,10 @@ class PostScraper:
                 _log.warning("Failed to fetch full content for post %d: %s", post["post_id"], exc)
                 enriched.append(post)
             n = i + 1
+            if self.progress_cb:
+                self.progress_cb(post["post_id"], n, total)
             if n % 25 == 0 or n == total:
                 _log.info("  full content: %d/%d posts", n, total)
-                if self.progress_cb:
-                    self.progress_cb(n, total)
         return enriched
 
     def fetch_batch(self, user_id: int, page: int = 1) -> tuple[list[dict], bool]:
