@@ -41,13 +41,15 @@ def store_posts(username: str, posts: list[dict]):
     ids = []
     documents = []
     metadatas = []
+    seen_ids = set()
     
     for p in posts:
         post_id = str(p.get("post_id", ""))
         content = p.get("content", "").strip()
-        if not post_id or not content:
+        if not post_id or not content or post_id in seen_ids:
             continue
             
+        seen_ids.add(post_id)
         ids.append(post_id)
         documents.append(content)
         metadatas.append({

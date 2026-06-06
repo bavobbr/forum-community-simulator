@@ -274,5 +274,47 @@ def get_user_last_active(user_id: int) -> str:
     return json.dumps({"user_id": user_id, "last_active": date_str})
 
 
+@mcp.tool()
+def simulate_chat_turn(username: str, message: str, rag_context: str | None = None) -> str:
+    """Simulates a chat turn by generating a reply as the persona.
+    
+    Args:
+        username: The forum username of the persona.
+        message: The chat message from the user.
+        rag_context: JSON string containing a list of historical posts retrieved from RAG.
+    """
+    import json
+    import re
+    from pathlib import Path
+    from src.persona.models import PersonaProfile
+    from src.persona.generator import generate_chat_reply
+
+    safe_name = re.sub(r'[^\w\-]', '_', username)
+    profile_path = Path("agent_personas") / f"{safe_name}.json"
+    
+    if not profile_path.exists():
+        return f"Error: Persona profile not found at {profile_path}"
+        
+    try:
+        with open(profile_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        profile = PersonaProfile.from_dict(data)
+    except Exception as e:
+        return f"Error loading persona profile: {e}"
+
+    context_list = []
+    if rag_context:
+        try:
+            parsed = json.loads(rag_context)
+            if isinstance(parsed, list):
+                context_list = parsed
+            elif isinstance(parsed, dict) and "documents" in parsed:
+                context_list = [{"content": doc} for doc in parsed.get("documents", [])]
+        except Exception as e:
+            return f"Error parsing rag_context: {e}"
+
+    return generate_chat_reply(profile, message, rag_context=context_list)
+
+
 if __name__ == "__main__":
     mcp.run()

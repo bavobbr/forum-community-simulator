@@ -32,7 +32,7 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
         dynamic_lines = "\n".join(f"- {p['content'][:400]}" for p in dynamic_context)
         dynamic_section = (
             f"## Relevante Eerdere Berichten\n"
-            f"Hier zijn enkele van je eerdere berichten over soortgelijke onderwerpen. Gebruik deze als context voor je huidige mening:\n"
+            f"Gebruik deze eerdere berichten UITSLUITEND om je Meningen en standpunten te bepalen, niet voor je schrijfstijl:\n"
             f"{dynamic_lines}\n\n"
         )
 
@@ -74,6 +74,7 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
         f"{interactions_section}"
         f"{dynamic_section}"
         f"## Voorbeeldberichten\n"
+        f"Gebruik deze voorbeeldberichten UITSLUITEND om je Schrijfstijl, opmaak en toon te bepalen:\n"
         f"{examples}\n\n"
         f"## Regels\n"
         f"- Schrijf ALTIJD in het Nederlands\n"
@@ -123,3 +124,22 @@ def generate_replies(profile: PersonaProfile, test_posts: list[dict]) -> list[di
         })
 
     return results
+
+
+def generate_chat_reply(profile: PersonaProfile, message: str, rag_context: list[dict] = None) -> str:
+    system = build_system_prompt(profile, dynamic_context=rag_context)
+    user_content = (
+        f"[Reageer op dit chatbericht als {profile.original_username}:]\n"
+        f"\"{message}\"\n\n"
+        f"Schrijf één reactie zoals {profile.reversed_username} dat zou doen. "
+        f"Schrijf alleen de reactietekst zelf — geen uitleg, geen opmaak, geen opsomming."
+    )
+    try:
+        resp = call_llm_raw(system, user_content, 2048, model=MODEL_FLASH)
+        reply = resp.text
+        if resp.candidates[0].finish_reason.name == "MAX_TOKENS":
+            reply += " [afgekapt]"
+        return reply
+    except Exception as exc:
+        logging.warning("generate_chat_reply failed for user %r: %s", profile.original_username, exc)
+        return "[generatie mislukt]"
