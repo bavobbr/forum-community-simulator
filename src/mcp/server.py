@@ -47,7 +47,10 @@ def get_user_posts(username: str, limit: int = 100, before_ts: int | None = None
     scraper = PostScraper(session, delay=6)
     
     posts, oldest_ts = scraper.fetch_window(username, before_ts=before_ts)
-    return json.dumps(posts[:limit])
+    return json.dumps({
+        "posts": posts[:limit],
+        "oldest_post_ts": oldest_ts
+    })
 
 
 @mcp.tool()
