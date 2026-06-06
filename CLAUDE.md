@@ -185,9 +185,10 @@ Each poll cycle (every `POLL_INTERVAL` seconds) runs in four phases:
 - Skip image-only posts (`[afbeelding]` with no text).
 - Call `gates.evaluate_post(post, profiles, conn)` → `list[tuple[PersonaProfile, float]]` (at most `_MAX_RESPONDERS = 2` per post to prevent pile-ons).
   - Gate logic per profile:
-    1. **Quote bypass**: if the alter's reversed username appears in a `[QUOTE=...]` BBCode tag in the content, pass (weight 1.0).
-    2. **Mention bypass**: if the alter's reversed username appears anywhere in the content, pass (weight 1.0).
-    3. **Tag bypass**: if any `interest_tag` appears (case-insensitive) in the content, pass.
+    0. **Short-post filter** (post-level, not per-profile): if stripped content (BBCode removed) has < 5 words, skip all profiles for this post.
+    1. **Quote bypass**: if the alter's reversed username appears via `"originally posted by username"` pattern (VBulletin's rendered quote text), pass (weight 1.0).
+    2. **Mention bypass**: if the alter's reversed username appears anywhere in the content, pass (weight = `topic_weights.get(forum, 1.0)`).
+    3. **Tag bypass**: if any `interest_tag` appears (case-insensitive) in the content, pass (weight = `topic_weights.get(forum, 1.0)`).
     4. **Topic weight**: otherwise, skip if `topic_weights[forum] < 0.2`; then stochastic skip with `random() >= weight`.
     5. **Rate cap**: skip if `hourly_count >= hourly_cap` or `daily_count >= daily_cap` (checked in `rate_counters` DB table; only incremented in live mode).
   - Survivors sorted by weight descending; top 2 returned with their weights.

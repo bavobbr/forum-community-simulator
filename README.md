@@ -76,6 +76,8 @@ graph TD
 
 ## Sequence diagram — live event loop
 
+> This diagram depicts **forum-wide mode**. In sandbox mode `getdaily` is replaced by direct per-thread fetches and gate evaluation uses `sandbox_gates.py` instead of `gates.py`; the review queue and auto-approve flow are identical.
+
 ```mermaid
 sequenceDiagram
     actor Operator
@@ -308,13 +310,14 @@ Every unseen post is checked against every loaded persona. For each pair, the ga
 |---|------|--------|
 | 1 | Post author is an alter ego | Skip — no alter-to-alter replies |
 | 2 | Post is from an excluded forum (Discretie, HQ, Forum Games, Donations) | Skip |
-| 3 | Post quotes this alter's reversed username | Pass — weight 1.0, skip to rate check |
-| 4 | Post mentions this alter's reversed username | Pass — weight 1.0, skip to rate check |
-| 5 | Any of this persona's interest tags appears in the post | Pass — weight = forum weight or 1.0 |
-| 6 | Per-forum topic weight < 0.20 | Skip |
-| 7 | `random() >= topic_weight` | Skip (stochastic) |
-| 8 | Hourly count ≥ `hourly_cap` (default 3) | Skip — rate limited |
-| 9 | Rolling 24h count ≥ `daily_cap` (default 10) | Skip — daily cap reached |
+| 3 | Post has < 5 words after stripping BBCode (all profiles) | Skip |
+| 4 | Post quotes this alter's reversed username (`"originally posted by"` pattern) | Pass — weight 1.0, skip to rate check |
+| 5 | Post mentions this alter's reversed username | Pass — weight = forum weight (default 1.0), skip to rate check |
+| 6 | Any of this persona's interest tags appears in the post | Pass — weight = forum weight (default 1.0), skip to rate check |
+| 7 | Per-forum topic weight < 0.20 | Skip |
+| 8 | `random() >= topic_weight` | Skip (stochastic) |
+| 9 | Hourly count ≥ `hourly_cap` (default 3) | Skip — rate limited |
+| 10 | Rolling 24h count ≥ `daily_cap` (default 10) | Skip — daily cap reached |
 | — | Passes all gates | Add to candidate pool — max 2 per post |
 
 ### Stage 2 — Cycle-level selection
@@ -339,11 +342,13 @@ flowchart TD
     B -- yes --> SKIP1([Skip])
     B -- no --> C{Excluded\nforum?}
     C -- yes --> SKIP2([Skip])
-    C -- no --> D{Post quotes\nthis alter?}
+    C -- no --> WORDS{Content < 5 words\nafter stripping BBCode?}
+    WORDS -- yes --> SKIP_W([Skip — too short])
+    WORDS -- no --> D{Post quotes\nthis alter?}
     D -- yes --> W1[weight = 1.0]
     W1 --> RATE
     D -- no --> E{Username\nmentioned?}
-    E -- yes --> W2[weight = 1.0]
+    E -- yes --> W2[weight = forum weight\ndefault 1.0]
     W2 --> RATE
     E -- no --> F{Interest tag\nmatches?}
     F -- yes --> W3[weight = forum weight]
