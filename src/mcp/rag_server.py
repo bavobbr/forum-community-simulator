@@ -1,4 +1,14 @@
 import json
+import os
+import sys
+
+# Ensure the root directory is in sys.path so src module can be resolved 
+# when this file is executed directly.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
+from dotenv import load_dotenv
+load_dotenv()
+
 from mcp.server.fastmcp import FastMCP
 from src.rag.db import store_posts, search_posts, drop_posts, get_user_post_counts
 

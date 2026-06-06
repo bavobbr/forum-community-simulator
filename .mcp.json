@@ -2,7 +2,7 @@
   "mcpServers": {
     "forum-simulator": {
       "type": "stdio",
-      "command": "python3",
+      "command": ".venv\\Scripts\\python.exe",
       "args": [
         "-m",
         "src.mcp.server"
@@ -11,7 +11,7 @@
     },
     "forum-rag-mcp": {
       "type": "stdio",
-      "command": "python3",
+      "command": ".venv\\Scripts\\python.exe",
       "args": [
         "-m",
         "src.mcp.rag_server"
@@ -19,4 +19,4 @@
       "env": {}
     }
   }
-}
+}
