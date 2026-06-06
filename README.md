@@ -188,6 +188,55 @@ sequenceDiagram
 
 ---
 
+## Agentic Builder sequence — building a persona (Phase 1.5)
+
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant Orch as Orchestrator Agent
+    participant DC as DataCollector
+    participant PA as PersonaAnalyzer
+    participant MCP as MCP Server
+    participant Gemini as Internal LLM
+    participant Disk as Local Filesystem
+
+    Operator->>Orch: "Build a persona for username"
+    
+    Orch->>DC: invoke_subagent(username)
+    loop pagination
+        DC->>MCP: get_user_posts
+        MCP-->>DC: JSON array of posts
+    end
+    DC->>Disk: Append to scratch/{username}_raw.json
+    DC-->>Orch: Done
+    
+    Orch->>PA: invoke_subagent(scratch_path)
+    PA->>MCP: format_persona_prompt
+    MCP-->>PA: Strict Dutch prompt string
+    PA->>Gemini: generate JSON from prompt
+    Gemini-->>PA: Persona JSON string
+    PA-->>Orch: Return JSON string
+    
+    Orch->>Disk: Save scratch/{username}_llm.json
+    Orch->>MCP: save_approved_persona
+    
+    alt User in approved_accounts.json
+        MCP->>Disk: Hydrate & save to agent_personas/{username}.json
+        MCP-->>Orch: Success
+    else Missing identity fields
+        MCP-->>Orch: Error: Missing user_id, etc.
+        Orch->>Operator: Please provide user_id, post_count...
+        Operator-->>Orch: (provides fields)
+        Orch->>MCP: save_approved_persona(with args)
+        MCP->>Disk: Hydrate & save to agent_personas/{username}.json
+        MCP-->>Orch: Success
+    end
+    
+    Orch->>Operator: "Persona successfully built and hydrated!"
+```
+
+---
+
 ## Setup
 
 ### Prerequisites
