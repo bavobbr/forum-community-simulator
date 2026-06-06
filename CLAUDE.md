@@ -2,7 +2,7 @@
 
 ## What this project does
 
-24-hour AI event on `your-forum.example.com` (VBulletin 3.7, Dutch-language shrimp-keeping forum). The 26 most historically active members who have been inactive for 2+ years are "resurrected" as AI alter egos. Each alter ego has a reversed username (e.g. `ShrimpKing` → `gniKpmirS`), a mirrored avatar, and a persona built from their actual post history. During the event they respond live to forum activity as those members would have.
+24-hour AI event on `your-forum.example.com` (VBulletin 3.7, Dutch-language shrimp-keeping forum). The 27 most historically active members who have been inactive for 2+ years are "resurrected" as AI alter egos. Each alter ego has a reversed username (e.g. `ShrimpKing` → `gniKpmirS`), a mirrored avatar, and a persona built from their actual post history. During the event they respond live to forum activity as those members would have.
 
 ## Entry points
 
@@ -35,7 +35,7 @@ src/
     db.py                 # SQLite (event.db) for pending/seen posts
     webui.py              # Flask approval queue UI
 config/
-  approved_accounts.json  # 25 approved alter egos (input to workbench)
+  approved_accounts.json  # 27 approved alter egos (input to workbench)
   test_posts.json         # Test posts used during workbench persona evaluation
 personas/                 # Generated persona JSON files (gitignored)
   {username}.json         # One file per persona; loaded by event.py
@@ -167,6 +167,7 @@ AUTO_APPROVE_MINUTES=10   # minutes before a queued reply auto-approves
 REPLIES_PER_CYCLE=3       # max replies generated per poll cycle (forum-wide mode only)
 SANDBOX_THREAD_IDS=       # comma-separated thread IDs; if set, activates sandbox mode
 SANDBOX_REPLIES_PER_POST=3 # max random bot replies per unmentioned post (sandbox mode)
+INACTIVITY_YEARS=2        # minimum years of inactivity to qualify as a candidate (select_accounts.py)
 ```
 
 ## Event poll algorithm (`event.py` + `src/event/`)
@@ -184,10 +185,11 @@ Each poll cycle (every `POLL_INTERVAL` seconds) runs in four phases:
 - Skip image-only posts (`[afbeelding]` with no text).
 - Call `gates.evaluate_post(post, profiles, conn)` → `list[tuple[PersonaProfile, float]]` (at most `_MAX_RESPONDERS = 2` per post to prevent pile-ons).
   - Gate logic per profile:
-    1. **Mention bypass**: if the alter's reversed username appears in the content, pass (weight defaults to 1.0).
-    2. **Tag bypass**: if any `interest_tag` appears (case-insensitive) in the content, pass.
-    3. **Topic weight**: otherwise, skip if `topic_weights[forum] < 0.2`; then stochastic skip with `random() >= weight`.
-    4. **Rate cap**: skip if `hourly_count >= hourly_cap` or `daily_count >= daily_cap` (checked in `rate_counters` DB table; only incremented in live mode).
+    1. **Quote bypass**: if the alter's reversed username appears in a `[QUOTE=...]` BBCode tag in the content, pass (weight 1.0).
+    2. **Mention bypass**: if the alter's reversed username appears anywhere in the content, pass (weight 1.0).
+    3. **Tag bypass**: if any `interest_tag` appears (case-insensitive) in the content, pass.
+    4. **Topic weight**: otherwise, skip if `topic_weights[forum] < 0.2`; then stochastic skip with `random() >= weight`.
+    5. **Rate cap**: skip if `hourly_count >= hourly_cap` or `daily_count >= daily_cap` (checked in `rate_counters` DB table; only incremented in live mode).
   - Survivors sorted by weight descending; top 2 returned with their weights.
 
 **Phase 3 — Cap & generate.** Collect all `(post, profile, weight)` pairs from the entire cycle. Sort by weight descending. Take the top `REPLIES_PER_CYCLE` (default 3). For each selected pair:
@@ -202,6 +204,8 @@ The cycle cap is the primary anti-spam control: it prevents startup bursts (getd
 ### Sandbox mode (`SANDBOX_THREAD_IDS=id1,id2,...`)
 
 Watches a fixed set of threads instead of scanning the whole forum. Intended for a dedicated interaction space where real users can trigger bots directly.
+
+At startup, `event.py` parses `SANDBOX_THREAD_IDS`, then subtracts `_EXCLUDED_THREAD_IDS` (defined in `poller.py` — currently `{23585}`, the experiment meta-thread). If the result is empty after exclusion (e.g. the user listed only excluded threads), a warning is logged and the run falls back to forum-wide mode.
 
 **Phase 1 — Fetch.** `poller.fetch_sandbox_posts(scanner, thread_ids)` fetches `showthread.php?goto=newpost&t={id}` for each watched thread directly (no `getdaily`). Returns the same `list[dict]` format. `forum_id` and `forum_name` are empty/zero (not needed).
 
@@ -232,7 +236,7 @@ All domain modules patch at the call site: `patch("src.persona.analyzer.call_llm
 ## Current state (2026-05-31)
 
 All plans complete:
-1. Account selection — 25 approved alter egos in `config/approved_accounts.json`
+1. Account selection — 27 approved alter egos in `config/approved_accounts.json`
 2. Persona workbench — fully functional, uses `gemini-3.1-pro-preview` for analysis, `gemini-3.5-flash` for sample previews
 3. Event orchestrator — fully functional, uses `gemini-3.5-flash`
 4. Sandbox thread mode — implemented; set `SANDBOX_THREAD_IDS` in `.env` to activate

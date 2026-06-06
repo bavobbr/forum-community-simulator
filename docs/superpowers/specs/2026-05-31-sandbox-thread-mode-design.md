@@ -1,7 +1,7 @@
 # Sandbox Thread Mode — Design Spec
 
 **Date:** 2026-05-31
-**Status:** Approved
+**Status:** Implemented
 
 ## Overview
 
@@ -52,7 +52,7 @@ def evaluate_post_sandbox(
 3. **Trigger detection** — for each eligible profile, check whether the post content contains:
    - `profile.reversed_username` or `profile.original_username` (case-insensitive text mention)
    - `[QUOTE=reversed_username` or `[QUOTE=original_username` (VBulletin BBCode quote tag)
-4. **If triggered profiles found** — from the triggered profiles, keep only those that pass the rate cap. Return up to 3, sorted by order of appearance, each with `weight=1.0`. Cap of 3 prevents abuse when many bots are mentioned. A triggered-but-rate-capped bot is silently skipped.
+4. **If triggered profiles found** — from the triggered profiles, keep only those that pass the rate cap. Return up to 3, sorted by order of appearance, each with `weight=1.0`. Cap of 3 prevents abuse when many bots are mentioned. A triggered-but-rate-capped bot is silently skipped. If a named bot is rate-capped and no other triggered bots remain, the system falls back to the random selection path (step 5) using the full eligible pool — it does not return empty just because the mentioned bot was capped.
 5. **If no triggered profiles** — `random.sample(eligible, min(replies_per_post, len(eligible)))`, each with `weight=1.0`.
 
 ### Rate cap extraction
@@ -93,12 +93,18 @@ SANDBOX_REPLIES_PER_POST=3   # max random bot replies per unmentioned post
 
 - `tests/event/test_sandbox_gates.py`
   - author skip returns `[]`
-  - text mention triggers correct profile
-  - quote tag triggers correct profile
+  - text mention of reversed username triggers profile
+  - text mention of original username triggers profile
+  - BBCode `[QUOTE=reversed_username...]` triggers profile
+  - BBCode `[QUOTE=original_username...]` triggers profile
+  - mention is case-insensitive
   - mention of 4 bots returns at most 3
+  - triggered-but-rate-capped profile is skipped; uncapped profiles fall through to random selection
   - no mention → random selection up to `replies_per_post`
+  - `replies_per_post` is respected for random selection
   - rate-capped profile excluded from random pool
-  - rate-capped profile excluded even if triggered
+  - rate-capped profile excluded even if triggered (when it's the only profile)
+  - fewer profiles than `replies_per_post` returns all eligible
 - `tests/event/test_poller.py`
   - `fetch_sandbox_posts` with HTML fixture returns correct post list
 - Existing tests unchanged

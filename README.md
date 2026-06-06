@@ -2,7 +2,7 @@
 
 A 24-hour AI experiment on [your-forum.example.com](https://your-forum.example.com) — for forum built on VBulletin 3.7.
 
-The 25 most historically active members who have been inactive for 2+ years are **resurrected as AI alter egos**. Each alter ego gets a reversed username, a mirror-flipped avatar, and a persona built from their actual post history. During the event they respond live to forum activity — as those members would have.
+The 27 most historically active members who have been inactive for 2+ years are **resurrected as AI alter egos**. Each alter ego gets a reversed username, a mirror-flipped avatar, and a persona built from their actual post history. During the event they respond live to forum activity — as those members would have.
 
 ---
 
@@ -16,7 +16,11 @@ Scrapes each inactive member's post history, feeds it to Gemini Pro, and builds 
 
 ### Phase 2 — Live Event (during the 24h window)
 
-Polls the forum every 5 minutes for new posts. A gate layer decides which alter egos should respond (based on topic relevance, rate limits, and direct mentions). Gemini Flash generates a reply in that persona's voice. The reply lands in a local review queue where you approve, edit, discard, or regenerate it before it goes live.
+Runs in one of two mutually exclusive modes set by `SANDBOX_THREAD_IDS`:
+
+**Forum-wide mode (default):** Polls the forum every 5 minutes for new posts. A gate layer decides which alter egos should respond (based on topic relevance, rate limits, and direct mentions). Gemini Flash generates a reply in that persona's voice. The reply lands in a local review queue where you approve, edit, discard, or regenerate it before it goes live.
+
+**Sandbox mode (`SANDBOX_THREAD_IDS=...`):** Watches a fixed set of threads instead of the whole forum. Any user can interact directly with the alter egos in those threads. Mentioning a bot by name (or quoting them with VBulletin's quote tag) triggers that specific bot; if no bot is mentioned, a random selection responds.
 
 ---
 
@@ -42,6 +46,7 @@ graph TD
         EV[event.py]
         PO[event/poller.py]
         GT[event/gates.py]
+        SG[event/sandbox_gates.py]
         TS[event/thread_scraper.py]
         EG["event/generator.py\nGemini Flash"]
         DB[("event.db\nSQLite")]
@@ -49,8 +54,10 @@ graph TD
         PTR[event/poster.py]
 
         EV --> PO
-        PO -->|new posts| GT
+        PO -->|forum-wide posts| GT
+        PO -->|sandbox posts| SG
         GT -->|selected personas| TS
+        SG -->|selected personas| TS
         TS -->|thread context| EG
         EG -->|reply text| DB
         DB --> WUI
@@ -207,7 +214,9 @@ LOOKBACK_HOURS=48        # ignore posts older than this on startup
 POLL_INTERVAL=300        # seconds between forum polls
 SEARCH_DELAY=6           # seconds between post-history requests (forum rate limit)
 AUTO_APPROVE_MINUTES=10  # minutes before a queued reply auto-approves
-REPLIES_PER_CYCLE=3      # max LLM replies generated per poll cycle
+REPLIES_PER_CYCLE=3      # max LLM replies generated per poll cycle (forum-wide mode)
+SANDBOX_THREAD_IDS=      # comma-separated thread IDs; if set, activates sandbox mode
+SANDBOX_REPLIES_PER_POST=3  # max random bot replies per unmentioned post (sandbox mode)
 ```
 
 ---
@@ -250,10 +259,10 @@ Opens the review queue at **http://localhost:5000** and starts polling. Set `LIV
 ```
 workbench.py              # Phase 1 entry point
 event.py                  # Phase 2 entry point
-select_accounts.py        # One-off: selected the 26 inactive members
+select_accounts.py        # One-off: selected the 27 inactive members
 
 config/
-  approved_accounts.json  # 25 approved alter egos
+  approved_accounts.json  # 27 approved alter egos
   test_posts.json         # Test prompts used during persona evaluation
 
 personas/                 # Generated persona profiles (gitignored)
@@ -265,11 +274,11 @@ src/
   models.py               # Shared data models
   persona/                # Phase 1: analysis + reply generation
   workbench/              # Phase 1: interactive TUI
-  event/                  # Phase 2: polling, gating, posting, web UI
+  event/                  # Phase 2: polling, gating (gates.py / sandbox_gates.py), posting, web UI
   scraper/                # Forum scrapers (member list, profiles)
   selection/              # Account selection pipeline
 
-tests/                    # pytest, 129 tests
+tests/                    # pytest, 189 tests
 docs/superpowers/
   specs/                  # Design documents
   plans/                  # Implementation plans
@@ -368,7 +377,7 @@ flowchart TD
 ## Tests
 
 ```bash
-pytest                     # all 129 tests
+pytest                     # all 189 tests
 pytest -v tests/event/     # event layer only
 pytest --cov=src           # with coverage
 ```

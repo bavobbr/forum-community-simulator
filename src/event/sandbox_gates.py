@@ -11,8 +11,12 @@ def _find_triggered(post: dict, profiles: list[PersonaProfile]) -> list[PersonaP
     content_lower = post.get("content", "").lower()
     triggered = []
     for profile in profiles:
-        if (profile.reversed_username.lower() in content_lower
-                or profile.original_username.lower() in content_lower):
+        rev = profile.reversed_username.lower()
+        orig = profile.original_username.lower()
+        if (rev in content_lower
+                or orig in content_lower
+                or f"[quote={rev}" in content_lower
+                or f"[quote={orig}" in content_lower):
             triggered.append(profile)
     return triggered
 

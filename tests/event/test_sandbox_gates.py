@@ -57,6 +57,20 @@ def test_text_mention_original_name_triggers(conn):
     assert profile in [p for p, _ in result]
 
 
+def test_bbcode_quote_tag_triggers(conn):
+    profile = _make_profile(reversed_username="ejdar", original_username="radje")
+    post = _make_post(content="[QUOTE=ejdar;12345]\neerder geschreven\n[/QUOTE]\nGoed punt!")
+    result = evaluate_post_sandbox(post, [profile], conn)
+    assert profile in [p for p, _ in result]
+
+
+def test_bbcode_quote_original_name_triggers(conn):
+    profile = _make_profile(reversed_username="ejdar", original_username="radje")
+    post = _make_post(content="[QUOTE=radje;99]\noud bericht\n[/QUOTE]\nIk ben het eens.")
+    result = evaluate_post_sandbox(post, [profile], conn)
+    assert profile in [p for p, _ in result]
+
+
 def test_mention_is_case_insensitive(conn):
     profile = _make_profile(reversed_username="EjDaR")
     post = _make_post(content="ejdar hoi hoe gaat het met je?")
