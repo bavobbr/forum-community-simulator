@@ -178,6 +178,13 @@ python workbench.py
 - Press `b` to trigger bulk initial analysis for all unstarted alter egos.
 - Inside a persona: `l` loads/refines, `s` generates sample preview replies, `a` approves, `e` edits JSON, `x` resets.
 
+### Agentic Persona Builder (via Gemini Skills)
+As an alternative to the Python `workbench.py` CLI, AI agents can autonomously build personas using the **Build Persona Skill** (`.gemini/skills/build-persona/SKILL.md`).
+- Just ask the agent to *"build a persona for username X"*.
+- The agent will dynamically spawn a `DataCollector` subagent to paginate through the `get_user_posts` MCP tool and save raw posts to a scratch file.
+- It will then spawn a `PersonaAnalyzer` subagent to ingest the raw posts into its massive context window and generate the final structured JSON.
+- The resulting JSON is saved to the `agent_personas/` directory (which is safely gitignored to protect user data).
+
 ### Running the Orchestrator (Live Event)
 Runs the polling thread and launches the Flask local review UI.
 

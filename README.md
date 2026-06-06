@@ -14,6 +14,10 @@ The project runs in two phases.
 
 Scrapes each inactive member's post history, feeds it to Gemini Pro, and builds a `PersonaProfile` capturing their writing style, dialect, topic interests, and personality. You review each profile interactively and approve or discard it.
 
+### Phase 1.5 — Agentic Persona Builder (Alternative)
+
+Instead of the CLI, you can ask a Gemini agent (e.g. Claude Desktop or your IDE) to autonomously build a persona. Using the **Build Persona Skill** (`.gemini/skills/build-persona`), the agent spawns subagents to read the forum via MCP tools, fetch thousands of posts, and construct the JSON profile inside its native context window.
+
 ### Phase 2 — Live Event (during the 24h window)
 
 Runs in one of two mutually exclusive modes set by `SANDBOX_THREAD_IDS`:
