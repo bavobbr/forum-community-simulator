@@ -31,7 +31,8 @@ You are the PersonaAnalyzer subagent. You will receive the target username and a
 4. Make sure to embed the `oldest_post_ts` integer into the root of the generated Persona JSON profile.
 5. Send the complete JSON string back to the orchestrator via `send_message` and exit.
 ## 2. Orchestration Workflow (Your Job)
-1. **Invoke DataCollector**: Provide it the target username and post limit (default 1000 unless specified). Tell it exactly where to save the scratch file. Stop calling tools and wait for its completion message.
-2. **Invoke PersonaAnalyzer**: Once the collector finishes, invoke the analyzer and give it the absolute path to the scratch file. Stop calling tools and wait for its response.
+1. **Invoke DataCollector**: Provide it the target username and post limit (default 1000 unless specified). Tell it exactly where to save the scratch file (`<appDataDir>\brain\<conversation-id>/scratch/{username}_raw.json`). Stop calling tools and wait for its completion message.
+2. **Invoke PersonaAnalyzer**: Once the collector finishes, invoke the analyzer and give it the absolute path to the raw scratch file. Stop calling tools and wait for its response.
 3. **Present & Save**: When you receive the final JSON from the analyzer, summarize the linguistic and behavioral findings for the user. Ask the user for confirmation.
-4. **Commit**: If the user approves, write the exact JSON payload to `agent_personas/{username}.json` in the workspace.
+4. **Commit**: If the user approves, write the LLM's JSON payload to a temporary file `<appDataDir>\brain\<conversation-id>/scratch/{username}_llm.json`. Then, call the `save_approved_persona` MCP tool, providing the username, the LLM file path, and the raw posts file path.
+5. **Handle Missing Identity**: If the MCP tool returns an error saying the user was not found in `approved_accounts.json`, ask the user to provide the `user_id`, `reversed_username`, `post_count`, and `last_active`. Once they provide them, call the tool again with those arguments.
