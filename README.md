@@ -249,8 +249,10 @@ sequenceDiagram
 ### Install
 
 ```bash
-pip install -r requirements.txt
+make install
 ```
+
+This runs `pip install -r requirements.txt`. All dependencies — including `chromadb` for the RAG MCP server — are declared there.
 
 ### Configure
 
