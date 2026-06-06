@@ -33,6 +33,7 @@ To connect the server to an MCP-compatible client like Claude Desktop, add the f
 
 - **`get_user_posts(username, limit, before_ts)`**: Uses advanced search to fetch historical posts for a given user. Handles pagination and limit capping automatically.
 - **`format_persona_prompt(username, filepath)`**: Reads a scratch JSON file of raw posts and builds the highly constrained, pre-formatted Dutch prompt string required for Persona analysis.
+- **`save_approved_persona(username, llm_file, raw_posts_file, ...)`**: Hydrates an LLM-generated behavioral profile with explicit identity fields from `approved_accounts.json` and automatically-selected example posts, saving the final payload to `agent_personas/`.
 - **`get_thread_context(post_id, n)`**: Fetches the most recent posts inside a thread leading up to a specific post.
 - **`get_daily_activity()`**: Uses `search.php?do=getdaily` to fetch the latest unread posts across the forum.
 - **`post_reply(username, password, thread_id, message)`**: Authenticates as the provided alter-ego and posts a reply.

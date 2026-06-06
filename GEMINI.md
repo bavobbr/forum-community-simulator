@@ -209,6 +209,7 @@ This server allows external AI agents (like Claude Desktop or Cursor) to securel
 - **Mutations & Search Actions:**
   - `get_user_posts` wraps `PostScraper.fetch_window` to support paging.
   - `format_persona_prompt` formats raw JSON posts into the highly constrained Dutch prompt.
+  - `save_approved_persona` hydrates LLM-generated profiles with identity fields from `approved_accounts.json` and Python-selected example posts.
   - `get_thread_context` retrieves conversation history.
   - `get_daily_activity` wraps the `getdaily` poller.
   - `post_reply` logs in securely as a specific alter-ego to post live responses.
