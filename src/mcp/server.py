@@ -10,6 +10,7 @@ from src.event.thread_scraper import fetch_thread_context
 from src.event.poster import post_reply as _post_reply
 from src.scraper.memberlist import parse_memberlist
 from src.scraper.profile import parse_last_active
+from src.persona.analyzer import _format_posts, _SCHEMA_DESCRIPTION
 
 load_dotenv()
 
@@ -59,6 +60,33 @@ def get_thread_context(post_id: int, n: int = 5) -> str:
     session = get_session()
     posts = fetch_thread_context(session, post_id, n=n)
     return json.dumps(posts)
+
+
+@mcp.tool()
+def format_persona_prompt(username: str, filepath: str) -> str:
+    """Reads a scratch JSON file of posts and builds the exact prompt string for Persona analysis.
+    
+    Args:
+        username: The forum username being analyzed.
+        filepath: Absolute path to the scratch JSON file containing the raw posts.
+    """
+    with open(filepath, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        
+    # Handle both wrapped {"posts": [...]} and raw array [...]
+    posts = data.get("posts", []) if isinstance(data, dict) else data
+        
+    posts_text = _format_posts(posts)
+    
+    prompt = (
+        f"Analyseer de volgende {len(posts)} forumberichten van gebruiker "
+        f'"{username}".\n\n'
+        f"Berichten:\n{posts_text}\n\n"
+        f"Geef een JSON object terug met dit schema:\n{_SCHEMA_DESCRIPTION}\n\n"
+        f"Beperk opinion_fingerprint tot maximaal 25 items — maak ze concreet en bruikbaar als debatpunten. "
+        f"Geef enkel het JSON object terug, geen uitleg."
+    )
+    return prompt
 
 
 @mcp.tool()
