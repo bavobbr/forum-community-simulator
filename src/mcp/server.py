@@ -1,6 +1,6 @@
 import os
 import json
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
 from dotenv import load_dotenv
 
 from src.session import VBulletinSession
@@ -35,22 +35,83 @@ def get_session() -> VBulletinSession:
 
 
 @mcp.tool()
-def get_user_posts(username: str, limit: int = 100, before_ts: int | None = None) -> str:
+def get_user_posts(username: str, limit: int = 100, before_ts: int | None = None, output_filepath: str | None = None, ctx: Context = None) -> str:
     """Fetch recent forum posts by a specific user.
     
     Args:
         username: The forum username to search for.
-        limit: Number of posts to return (default 100). Max 200 per VBulletin limits.
+        limit: Number of posts to return (default 100).
         before_ts: Optional Unix timestamp upper bound (only fetch posts older than this).
+        output_filepath: Optional absolute path to save the JSON output directly to disk.
     """
     session = get_session()
-    scraper = PostScraper(session, delay=6)
     
-    posts, oldest_ts = scraper.fetch_window(username, before_ts=before_ts)
-    return json.dumps({
-        "posts": posts[:limit],
-        "oldest_post_ts": oldest_ts
-    })
+    def on_progress(current: int, total: int):
+        if ctx:
+            ctx.info(f"Scraping {username}: {current}/{total} full posts fetched...")
+            if hasattr(ctx, "report_progress"):
+                ctx.report_progress(current, total)
+        
+        try:
+            with open("scrape_progress.log", "w", encoding="utf-8") as f:
+                f.write(f"Scraping {username}: {current}/{total} posts fetched...\n")
+        except Exception:
+            pass
+                
+    scraper = PostScraper(session, delay=6, progress_cb=on_progress)
+    
+    all_posts = []
+    current_before_ts = before_ts
+    
+    while len(all_posts) < limit:
+        window_posts, oldest_ts = scraper.fetch_window(username, before_ts=current_before_ts)
+        if not window_posts:
+            break
+            
+        all_posts.extend(window_posts)
+        current_before_ts = oldest_ts
+        
+        if oldest_ts is None:
+            break
+            
+    all_posts = all_posts[:limit]
+    
+    if output_filepath:
+        import os
+        
+        existing_posts = []
+        if os.path.exists(output_filepath):
+            try:
+                with open(output_filepath, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    existing_posts = data.get("posts", []) if isinstance(data, dict) else data
+            except Exception:
+                pass
+                
+        combined_posts = existing_posts + all_posts
+        
+        final_obj = {
+            "posts": combined_posts,
+            "oldest_post_ts": current_before_ts
+        }
+        
+        os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+        
+        with open(output_filepath, 'w', encoding='utf-8') as f:
+            json.dump(final_obj, f, ensure_ascii=False, indent=2)
+            
+        return json.dumps({
+            "status": "success",
+            "fetched_posts": len(all_posts),
+            "total_posts": len(combined_posts),
+            "oldest_post_ts": current_before_ts,
+            "saved_to": output_filepath
+        })
+    else:
+        return json.dumps({
+            "posts": all_posts,
+            "oldest_post_ts": current_before_ts
+        })
 
 
 @mcp.tool()

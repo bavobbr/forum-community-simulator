@@ -92,6 +92,8 @@ The project uses the new Google GenAI Python SDK (`google-genai`).
 - **Example Posts:** Verbatim examples are parsed, selected, and truncated **in Python** (using `_select_examples` in `src/persona/analyzer.py`). This prevents Gemini Pro from wasting its output tokens returning original post text.
 - **JSON Outputs:** Prompts in `analyzer.py` explicitly instruct the models to return *only* valid JSON.
 - **Opinion Fingerprint Cap:** Up to 25 items are captured inside `PersonaProfile.opinion_fingerprint`.
+- **Conversational Mechanics & Psychology:** Six deep behavioral parameters (`psychological_profile`, `signature_phrases`, `conflict_behavior`, `humor_and_sarcasm`, `pet_peeves`, `formatting_quirks`) strictly constrain how the generated replies are structured emotionally and physically.
+- **Interest Tags Cap:** Up to 30+ items are captured inside `PersonaProfile.interest_tags`.
 
 ---
 

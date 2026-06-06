@@ -33,8 +33,14 @@ _SCHEMA_DESCRIPTION = """{
   "hourly_cap": max_posts_per_uur_als_int,
   "persona_summary": "Uitgebreide beschrijving van de persoonlijkheid in 6-10 zinnen: schrijfstijl, humor, typische onderwerpen, hoe ze reageren op anderen, en wat ze onderscheidt van andere forumleden.",
   "worldview": "Beschrijving in 3-5 zinnen van hoe deze persoon de wereld ziet: kernwaarden, algemene levensvisie, houding tegenover technologie/politiek/maatschappij, en hoe ze redeneren over onbekende onderwerpen.",
+  "psychological_profile": "Gedraag je als een gedragspsycholoog. Geef een diepgaande analyse (ongeveer 8-10 zinnen) van de onderliggende psychologie van deze persoon op basis van de beschikbare data. Leid af wat hun ware drijfveren, (mogelijke) onzekerheden, en sociale behoeftes zijn op het forum. Het is nadrukkelijk toegestaan om 'best effort' aannames te doen (gebruik bewoordingen als 'lijkt te wijzen op', 'waarschijnlijk', 'compenseert mogelijk voor'). Focus op *waarom* ze communiceren zoals ze doen.",
   "rhetorical_patterns": ["Patroon 1: hoe ze een discussie openen of reageren", "Patroon 2: hoe ze hun mening onderbouwen", "Patroon 3: hoe ze omgaan met tegenargumenten", ...],
-  "interest_tags": ["10-15 specifieke concrete onderwerpen: eigennamen, hobby's, merken, ploegen, spellen, games, tv-series, ... — dingen die letterlijk in posts voorkomen"]
+  "interest_tags": ["minstens 30 specifieke concrete onderwerpen: eigennamen, hobby's, merken, ploegen, spellen, games, tv-series, ... — dingen die letterlijk in posts voorkomen"],
+  "signature_phrases": ["specifieke stopwoorden of zinnetjes die ze vaak gebruiken, bv. 'Ah ja want', 'Soit', 'Kijk'"],
+  "conflict_behavior": "Hoe ze reageren op onenigheid: bv. passief-agressief, extreem koppig, negeren tegenargumenten, of blijven discussiëren met bronnen.",
+  "humor_and_sarcasm": "Beschrijving van hun humorstijl: bv. droog, zelfrelativerend, grof sarcasme, of helemaal afwezig.",
+  "pet_peeves": ["specifieke kleine ergernissen of onderwerpen die hen altijd defensief of kwaad maken"],
+  "formatting_quirks": "Fysieke opmaakgewoontes: bv. extreem lange alinea's, vreemd gebruik van witregels, overmatig cursief, etc."
 }"""
 
 
@@ -76,8 +82,14 @@ def _apply_analysis(profile: PersonaProfile, data: dict) -> None:
     profile.hourly_cap = data.get("hourly_cap", profile.hourly_cap)
     profile.persona_summary = data.get("persona_summary", profile.persona_summary)
     profile.worldview = data.get("worldview", profile.worldview)
+    profile.psychological_profile = data.get("psychological_profile", profile.psychological_profile)
     profile.rhetorical_patterns = data.get("rhetorical_patterns", profile.rhetorical_patterns)
     profile.interest_tags = data.get("interest_tags", profile.interest_tags)
+    profile.signature_phrases = data.get("signature_phrases", profile.signature_phrases)
+    profile.conflict_behavior = data.get("conflict_behavior", profile.conflict_behavior)
+    profile.humor_and_sarcasm = data.get("humor_and_sarcasm", profile.humor_and_sarcasm)
+    profile.pet_peeves = data.get("pet_peeves", profile.pet_peeves)
+    profile.formatting_quirks = data.get("formatting_quirks", profile.formatting_quirks)
 
 
 def analyze_first_batch(alter: dict, posts: list[dict]) -> PersonaProfile:
@@ -89,7 +101,7 @@ def analyze_first_batch(alter: dict, posts: list[dict]) -> PersonaProfile:
         f'"{alter["original_username"]}" (user_id: {alter["user_id"]}, totaal {alter["post_count"]} posts op het forum).\n\n'
         f"Berichten:\n{posts_text}\n\n"
         f"Geef een JSON object terug met dit schema:\n{_SCHEMA_DESCRIPTION}\n\n"
-        f"Beperk opinion_fingerprint tot maximaal 25 items — maak ze concreet en bruikbaar als debatpunten. "
+        f"Geef bij voorkeur 25 items in opinion_fingerprint (maar minstens 10) — maak ze concreet en bruikbaar als debatpunten. "
         f"Geef enkel het JSON object terug, geen uitleg."
     )
 
@@ -114,8 +126,14 @@ _REFINE_SCHEMA = """{
   "frequent_interactions_update": {"username": "ally | rival | neutral"},
   "persona_summary": "Herziene beschrijving als de nieuwe berichten dat rechtvaardigen, anders lege string.",
   "worldview": "Herziene worldview als de nieuwe berichten dat rechtvaardigen, anders lege string.",
+  "psychological_profile": "Herziene psychologische analyse als de nieuwe berichten nieuwe inzichten geven over hun drijfveren/onzekerheden, anders lege string.",
   "new_rhetorical_patterns": ["nieuw patroon niet al in het bestaande profiel"],
   "new_interest_tags": ["nieuwe tags niet al in het bestaande profiel"],
+  "new_signature_phrases": ["nieuwe zinnetjes niet al in het bestaande profiel"],
+  "conflict_behavior": "Herziene beschrijving als dit rechtvaardig is, anders lege string.",
+  "humor_and_sarcasm": "Herziene beschrijving als dit rechtvaardig is, anders lege string.",
+  "new_pet_peeves": ["nieuwe pet peeves niet al in het bestaande profiel"],
+  "formatting_quirks": "Herziene beschrijving als dit rechtvaardig is, anders lege string.",
   "typical_post_length": gemiddeld_aantal_woorden_per_bericht_als_int_of_null
 }"""
 
@@ -137,11 +155,29 @@ def _merge_refine(profile: PersonaProfile, data: dict) -> None:
     if data.get("worldview"):
         profile.worldview = data["worldview"]
 
+    if data.get("psychological_profile"):
+        profile.psychological_profile = data["psychological_profile"]
+
     new_patterns = [p for p in data.get("new_rhetorical_patterns", []) if p not in profile.rhetorical_patterns]
     profile.rhetorical_patterns.extend(new_patterns)
 
     new_tags = [t for t in data.get("new_interest_tags", []) if t not in profile.interest_tags]
     profile.interest_tags.extend(new_tags)
+
+    new_phrases = [p for p in data.get("new_signature_phrases", []) if p not in profile.signature_phrases]
+    profile.signature_phrases.extend(new_phrases)
+
+    if data.get("conflict_behavior"):
+        profile.conflict_behavior = data["conflict_behavior"]
+
+    if data.get("humor_and_sarcasm"):
+        profile.humor_and_sarcasm = data["humor_and_sarcasm"]
+
+    new_peeves = [p for p in data.get("new_pet_peeves", []) if p not in profile.pet_peeves]
+    profile.pet_peeves.extend(new_peeves)
+
+    if data.get("formatting_quirks"):
+        profile.formatting_quirks = data["formatting_quirks"]
 
     new_length = data.get("typical_post_length")
     if new_length:

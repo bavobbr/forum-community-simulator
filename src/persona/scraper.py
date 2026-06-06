@@ -130,10 +130,11 @@ def parse_has_next_page(html: str) -> bool:
 
 
 class PostScraper:
-    def __init__(self, session: VBulletinSession, delay: int = 6):
+    def __init__(self, session: VBulletinSession, delay: int = 6, progress_cb=None):
         self.session = session
         self.delay = delay
         self._search_ids: dict[int, str] = {}
+        self.progress_cb = progress_cb
 
     def _ensure_search_id(self, user_id: int) -> str:
         """Initialise search for user if not cached, return searchid."""
@@ -165,6 +166,8 @@ class PostScraper:
             n = i + 1
             if n % 25 == 0 or n == total:
                 _log.info("  full content: %d/%d posts", n, total)
+                if self.progress_cb:
+                    self.progress_cb(n, total)
         return enriched
 
     def fetch_batch(self, user_id: int, page: int = 1) -> tuple[list[dict], bool]:

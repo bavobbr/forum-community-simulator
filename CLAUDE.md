@@ -80,8 +80,14 @@ Key fields for AI context:
 | `frequent_interactions` | `dict[str, str]` | username → `"ally"`, `"rival"`, or `"neutral"` |
 | `persona_summary` | `str` | 6–10 sentence narrative description of the person |
 | `worldview` | `str` | Core values, outlook, and philosophy of life |
+| `psychological_profile` | `str` | Deep behavioral psychology, underlying drives, and insecurities |
 | `rhetorical_patterns` | `list[str]` | How the member argues and engages in discussion |
-| `interest_tags` | `list[str]` | 10–15 concrete keywords (names, games, teams, brands) that trigger a response even when `topic_weights` are low |
+| `signature_phrases` | `list[str]` | Common sayings, filler words, or verbal tics |
+| `conflict_behavior` | `str` | How the member reacts to disagreement |
+| `humor_and_sarcasm` | `str` | Style of humor or sarcasm (e.g. dry, absent, passive-aggressive) |
+| `pet_peeves` | `list[str]` | Specific topics that annoy or trigger them |
+| `formatting_quirks` | `str` | Physical layout habits like extreme paragraphs or punctuation |
+| `interest_tags` | `list[str]` | 30+ concrete keywords (names, games, teams, brands) that trigger a response even when `topic_weights` are low |
 | `example_posts` | `list[str]` | Few-shot examples used in the system prompt |
 
 `worldview` and `rhetorical_patterns` are used by both the analyzer and the generator to give the LLM deeper character context when generating replies to topics the member never directly addressed.

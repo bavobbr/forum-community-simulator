@@ -47,8 +47,16 @@ class PersonaProfile:
 
     # Deep character — used to extrapolate to new topics
     worldview: str = ""                          # core values, outlook, philosophy
+    psychological_profile: str = ""              # underlying behavioral psychology and drives
     rhetorical_patterns: list[str] = field(default_factory=list)  # how they argue and engage
     interest_tags: list[str] = field(default_factory=list)
+
+    # Conversational Mechanics
+    signature_phrases: list[str] = field(default_factory=list)
+    conflict_behavior: str = ""
+    humor_and_sarcasm: str = ""
+    pet_peeves: list[str] = field(default_factory=list)
+    formatting_quirks: str = ""
 
     # Event orchestrator — None means manual approval only
     auto_approve_minutes: int | None = None
@@ -93,7 +101,13 @@ class PersonaProfile:
             example_posts=d.get("example_posts", []),
             persona_summary=d.get("persona_summary", ""),
             worldview=d.get("worldview", ""),
+            psychological_profile=d.get("psychological_profile", ""),
             rhetorical_patterns=d.get("rhetorical_patterns", []),
             interest_tags=d.get("interest_tags", []),
+            signature_phrases=d.get("signature_phrases", []),
+            conflict_behavior=d.get("conflict_behavior", ""),
+            humor_and_sarcasm=d.get("humor_and_sarcasm", ""),
+            pet_peeves=d.get("pet_peeves", []),
+            formatting_quirks=d.get("formatting_quirks", ""),
             auto_approve_minutes=d.get("auto_approve_minutes", None),
         )

@@ -127,6 +127,7 @@ def _make_scraper(session_mock: MagicMock) -> PostScraper:
     scraper.session = session_mock
     scraper.delay = 0
     scraper._search_ids = {}
+    scraper.progress_cb = None
     return scraper
 
 
