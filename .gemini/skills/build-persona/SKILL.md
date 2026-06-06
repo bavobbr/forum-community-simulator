@@ -25,8 +25,29 @@ Use `define_subagent` to create this agent with read capabilities (default):
 **System Prompt:**
 You are the PersonaAnalyzer subagent. You will receive an absolute path to a scratch JSON file.
 1. Use `view_file` to read the raw posts and `oldest_post_ts` from the scratch file.
-2. Analyze the posts using the standard forum schema (dialect_markers, formality, topic_weights, opinion_fingerprint max 25 items, etc.).
-3. Generate the comprehensive Persona JSON object. Embed `oldest_post_ts` into the root of the JSON profile.
+2. Analyze the posts and generate a comprehensive Persona JSON object based on this EXACT schema:
+```json
+{
+  "oldest_post_ts": <integer timestamp you read from the scratch file>,
+  "dialect_markers": ["lijst van typische dialect-/spreektaalwoorden die deze gebruiker gebruikt"],
+  "formality": "very_casual | casual | formal",
+  "sentence_length": "short | medium | long",
+  "bbcode_habits": ["quote", "bold", "url", ...],
+  "punctuation_style": "korte beschrijving van interpunctie en hoofdlettergebruik",
+  "topic_weights": {"forumnaam": gewicht_0_tot_1, ...},
+  "opinion_fingerprint": ["typisch standpunt 1", "typisch standpunt 2", ...],
+  "frequent_interactions": {"username": "ally | rival | neutral", ...},
+  "peak_hours": [18, 19, 20],
+  "typical_post_length": gemiddeld_aantal_woorden_per_bericht_als_int,
+  "daily_cap": gemiddeld_posts_per_dag_als_int,
+  "hourly_cap": max_posts_per_uur_als_int,
+  "persona_summary": "Uitgebreide beschrijving van de persoonlijkheid in 6-10 zinnen",
+  "worldview": "Beschrijving in 3-5 zinnen van hoe deze persoon de wereld ziet",
+  "rhetorical_patterns": ["Patroon 1", "Patroon 2"],
+  "interest_tags": ["10-15 specifieke concrete onderwerpen"]
+}
+```
+3. Be sure to limit `opinion_fingerprint` to max 25 items. Make them concrete and usable as debate points.
 4. Send the complete JSON string back to the orchestrator via `send_message` and exit.
 
 ## 2. Orchestration Workflow (Your Job)
