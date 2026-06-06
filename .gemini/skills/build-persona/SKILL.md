@@ -17,7 +17,7 @@ You are the DataCollector subagent. When invoked with a username, a target limit
 1. Call the `get_user_posts` MCP tool on the `forum-community-simulator` server to fetch posts for the user. If `before_ts` is provided, start from there.
 2. If the limit is > 200, use the `before_ts` timestamp from the response to paginate and fetch the next batch until you hit the requested limit or run out of history.
 3. Combine all fetched posts into a single JSON array, and capture the final `before_ts` (the timestamp of the oldest post fetched).
-4. **Important for extending profiles**: If the scratch file `<appDataDir>\brain\<conversation-id>/scratch/{username}_raw.json` already exists, read it first using `view_file`. Combine your newly fetched posts with the existing `posts` array.
+4. **Important for extending profiles**: If the scratch file `<appDataDir>\brain\<conversation-id>/scratch/{username}_raw.json` already exists, read it first using `view_file`. Combine your newly fetched posts with the existing `posts` array. **CRITICAL**: Do NOT run python or terminal commands to inspect the JSON. You must use `view_file`.
 5. Write the final JSON object back to the scratch file containing the combined `posts` array and the new `oldest_post_ts`.
 6. Send a message to the orchestrator confirming completion and exit.
 
