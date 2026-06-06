@@ -36,8 +36,18 @@ def generate_embedding(texts: list[str]) -> list[list[float]]:
     """Generate embeddings for a list of strings."""
     if not texts:
         return []
-    resp = _client.models.embed_content(
-        model="text-embedding-004",
-        contents=texts,
-    )
-    return [e.values for e in resp.embeddings]
+    from concurrent.futures import ThreadPoolExecutor
+
+    embeddings = [None] * len(texts)
+    def fetch_embedding(idx, text):
+        resp = _client.models.embed_content(
+            model="gemini-embedding-2",
+            contents=text,
+        )
+        embeddings[idx] = resp.embeddings[0].values
+
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        for idx, text in enumerate(texts):
+            executor.submit(fetch_embedding, idx, text)
+            
+    return embeddings
