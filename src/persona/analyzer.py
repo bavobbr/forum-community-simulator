@@ -25,7 +25,7 @@ _SCHEMA_DESCRIPTION = """{
   "bbcode_habits": ["quote", "bold", "url", ...],
   "punctuation_style": "korte beschrijving van interpunctie en hoofdlettergebruik",
   "topic_weights": {"forumnaam": gewicht_0_tot_1, ...},
-  "opinion_fingerprint": ["typisch standpunt 1", "typisch standpunt 2", ...],
+  "opinion_fingerprint": ["JE MOET MINSTENS 25 EN MAXIMAAL 50 concrete standpunten genereren over diverse onderwerpen. Maak ze specifiek en bruikbaar als debatpunten."],
   "frequent_interactions": {"username": "ally | rival | neutral", ...},
   "peak_hours": [18, 19, 20],
   "typical_post_length": gemiddeld_aantal_woorden_per_bericht_als_int,
@@ -101,7 +101,7 @@ def analyze_first_batch(alter: dict, posts: list[dict]) -> PersonaProfile:
         f'"{alter["original_username"]}" (user_id: {alter["user_id"]}, totaal {alter["post_count"]} posts op het forum).\n\n'
         f"Berichten:\n{posts_text}\n\n"
         f"Geef een JSON object terug met dit schema:\n{_SCHEMA_DESCRIPTION}\n\n"
-        f"Geef bij voorkeur 25 items in opinion_fingerprint (maar minstens 10) — maak ze concreet en bruikbaar als debatpunten. "
+        f"Geef minimaal 25 tot maximaal 50 items in opinion_fingerprint — maak ze concreet en bruikbaar als debatpunten. "
         f"Geef enkel het JSON object terug, geen uitleg."
     )
 
@@ -143,7 +143,7 @@ def _merge_refine(profile: PersonaProfile, data: dict) -> None:
     profile.dialect_markers.extend(new_markers)
 
     new_opinions = [o for o in data.get("new_opinion_fingerprint", []) if o not in profile.opinion_fingerprint]
-    profile.opinion_fingerprint = (profile.opinion_fingerprint + new_opinions)[:25]
+    profile.opinion_fingerprint = (profile.opinion_fingerprint + new_opinions)[:50]
 
     profile.topic_weights.update(data.get("topic_weights_update", {}))
 
