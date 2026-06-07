@@ -86,7 +86,7 @@ def test_max_three_triggered_when_many_mentioned(conn):
     assert len(result) == 3
 
 
-def test_mentioned_but_capped_profile_skipped_uncapped_falls_to_random(conn):
+def test_mentioned_capped_profile_is_triggered_bypassing_cap(conn):
     capped = _make_profile(reversed_username="capped", original_username="deppac", hourly_cap=1)
     free = _make_profile(reversed_username="free00", original_username="00eerf", hourly_cap=5)
     now = datetime.now(timezone.utc)
@@ -96,8 +96,8 @@ def test_mentioned_but_capped_profile_skipped_uncapped_falls_to_random(conn):
     post = _make_post(content="capped wat vind jij hiervan?")
     result = evaluate_post_sandbox(post, [capped, free], conn, replies_per_post=3)
     names = [p.reversed_username for p, _ in result]
-    assert "capped" not in names
-    assert "free00" in names
+    assert "capped" in names
+    assert "free00" not in names
 
 
 def test_no_mention_returns_random_selection(conn):
@@ -129,7 +129,7 @@ def test_rate_capped_profile_excluded_from_random(conn):
     assert "free00" in names
 
 
-def test_rate_capped_profile_excluded_even_when_triggered(conn):
+def test_rate_capped_profile_included_when_triggered(conn):
     capped = _make_profile(reversed_username="capped", original_username="deppac", hourly_cap=1)
     now = datetime.now(timezone.utc)
     hour_key = now.strftime("%Y-%m-%dT%H")
@@ -137,7 +137,8 @@ def test_rate_capped_profile_excluded_even_when_triggered(conn):
     increment_rate(conn, "capped", hour_key, day_key)
     post = _make_post(content="capped wat vind jij hiervan eigenlijk?")
     result = evaluate_post_sandbox(post, [capped], conn)
-    assert result == []
+    names = [p.reversed_username for p, _ in result]
+    assert "capped" in names
 
 
 def test_fewer_profiles_than_replies_per_post(conn):

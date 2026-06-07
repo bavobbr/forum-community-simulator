@@ -31,11 +31,10 @@ def evaluate_post_sandbox(
     if post.get("author", "") in all_reversed:
         return []
 
-    eligible = [p for p in profiles if _passes_rate_cap(p, conn)]
-
-    triggered = _find_triggered(post, eligible)
+    triggered = _find_triggered(post, profiles)
     if triggered:
         return [(p, 1.0) for p in triggered[:_MAX_TRIGGERED]]
 
+    eligible = [p for p in profiles if _passes_rate_cap(p, conn)]
     sample = random.sample(eligible, min(replies_per_post, len(eligible)))
     return [(p, 1.0) for p in sample]

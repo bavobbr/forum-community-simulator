@@ -23,8 +23,9 @@ _TRIGGERING = {"post_id": 12, "author": "Carol", "content": "Is het goed?"}
 
 
 def _make_mock_resp(text="Da valt mee", finish_reason="STOP"):
+    import json
     resp = MagicMock()
-    resp.text = text
+    resp.text = json.dumps({"final_reply": text})
     resp.candidates[0].finish_reason.name = finish_reason
     return resp
 

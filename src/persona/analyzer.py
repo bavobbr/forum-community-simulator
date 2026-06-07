@@ -6,7 +6,15 @@ from src.persona.models import PersonaProfile
 
 def _select_examples(posts: list[dict], n: int = 10, max_chars: int = 400) -> list[str]:
     """Pick n representative posts from the post list, each capped at max_chars."""
-    candidates = [p for p in posts if len(p.get("content", "")) > 20]
+    def _has_quote(p: dict) -> bool:
+        if p.get("quoted_users"):
+            return True
+        content_lower = p.get("content", "").lower()
+        if "[quote" in content_lower or "[citaat" in content_lower:
+            return True
+        return False
+
+    candidates = [p for p in posts if len(p.get("content", "")) > 20 and not _has_quote(p)]
     if not candidates:
         return []
     step = max(1, len(candidates) // n)
@@ -22,7 +30,6 @@ _SCHEMA_DESCRIPTION = """{
   "dialect_markers": ["lijst van typische dialect-/spreektaalwoorden die deze gebruiker gebruikt"],
   "formality": "very_casual | casual | formal",
   "sentence_length": "short | medium | long",
-  "bbcode_habits": ["quote", "bold", "url", ...],
   "punctuation_style": "korte beschrijving van interpunctie en hoofdlettergebruik",
   "topic_weights": {"forumnaam": gewicht_0_tot_1, ...},
   "opinion_fingerprint": ["JE MOET MINSTENS 25 EN MAXIMAAL 50 concrete standpunten genereren over diverse onderwerpen. Maak ze specifiek en bruikbaar als debatpunten."],
@@ -71,7 +78,6 @@ def _apply_analysis(profile: PersonaProfile, data: dict) -> None:
     profile.dialect_markers = data.get("dialect_markers", profile.dialect_markers)
     profile.formality = data.get("formality", profile.formality)
     profile.sentence_length = data.get("sentence_length", profile.sentence_length)
-    profile.bbcode_habits = data.get("bbcode_habits", profile.bbcode_habits)
     profile.punctuation_style = data.get("punctuation_style", profile.punctuation_style)
     profile.topic_weights = data.get("topic_weights", profile.topic_weights)
     profile.opinion_fingerprint = data.get("opinion_fingerprint", profile.opinion_fingerprint)

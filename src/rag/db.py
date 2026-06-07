@@ -2,6 +2,7 @@ import os
 import chromadb
 from chromadb.api.types import EmbeddingFunction, Documents, Embeddings
 from src.llm import generate_embedding
+from src.persona.scraper import parse_post_date_timestamp
 
 class GeminiEmbeddingFunction(EmbeddingFunction):
     def __call__(self, input: Documents) -> Embeddings:
@@ -52,11 +53,18 @@ def store_posts(username: str, posts: list[dict]):
         seen_ids.add(post_id)
         ids.append(post_id)
         documents.append(content)
-        metadatas.append({
-            "date": str(p.get("date", "")),
+        date_str = str(p.get("date", ""))
+        ts = parse_post_date_timestamp(date_str)
+        
+        meta = {
+            "date": date_str,
             "forum_name": str(p.get("forum_name", "")),
             "thread_title": str(p.get("thread_title", "")),
-        })
+        }
+        if ts is not None:
+            meta["timestamp"] = ts
+            
+        metadatas.append(meta)
         
     if ids:
         collection.upsert(
@@ -106,6 +114,24 @@ def drop_posts(username: str):
         client.delete_collection(name=f"posts_{safe_name}")
     except Exception:
         pass
+
+def get_oldest_post_ts(username: str) -> int | None:
+    """Return the timestamp of the oldest post in the user's collection."""
+    collection = get_collection(username)
+    if collection.count() == 0:
+        return None
+        
+    results = collection.get(include=["metadatas"])
+    metadatas = results.get("metadatas", [])
+    
+    timestamps = []
+    for meta in metadatas:
+        if meta and "timestamp" in meta:
+            timestamps.append(meta["timestamp"])
+            
+    if timestamps:
+        return min(timestamps)
+    return None
 
 def get_user_post_counts() -> dict[str, int]:
     """Return a dictionary mapping username to post count."""

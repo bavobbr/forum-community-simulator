@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field, asdict
+from pydantic import BaseModel, Field
 
 
 @dataclass
@@ -21,7 +22,6 @@ class PersonaProfile:
     dialect_markers: list[str] = field(default_factory=list)
     formality: str = "casual"
     sentence_length: str = "medium"
-    bbcode_habits: list[str] = field(default_factory=list)
     punctuation_style: str = ""
 
     # Topics: forum_name -> weight 0.0-1.0
@@ -89,7 +89,6 @@ class PersonaProfile:
             dialect_markers=d.get("dialect_markers", []),
             formality=d.get("formality", "casual"),
             sentence_length=d.get("sentence_length", "medium"),
-            bbcode_habits=d.get("bbcode_habits", []),
             punctuation_style=d.get("punctuation_style", ""),
             topic_weights=d.get("topic_weights", {}),
             opinion_fingerprint=d.get("opinion_fingerprint", []),
@@ -111,3 +110,18 @@ class PersonaProfile:
             formatting_quirks=d.get("formatting_quirks", ""),
             auto_approve_minutes=d.get("auto_approve_minutes", None),
         )
+
+
+class GeneratedReply(BaseModel):
+    # 1. Emotional Anchoring (VAD Model)
+    valence: int = Field(ge=1, le=10, description="1 = extremely negative/hostile, 5 = neutral, 10 = extremely positive/friendly")
+    arousal: int = Field(ge=1, le=10, description="1 = extremely calm/bored/tired, 10 = extremely excited/agitated/furious")
+    dominance: int = Field(ge=1, le=10, description="1 = submissive/yielding, 10 = highly dominant/controlling the conversation")
+    
+    # 2. Cognitive Strategy
+    analysis: str = Field(description="Analyze the trigger based on your VAD state. Does it hit a pet peeve? Who is the speaker?")
+    core_message: str = Field(description="The literal message or opinion you want to convey.")
+    style_strategy: str = Field(description="Which signature phrases, dialect markers, and formatting will you use to reflect the VAD state?")
+    
+    # 3. Execution
+    final_reply: str = Field(description="The final public forum reply, written exactly as the persona.")

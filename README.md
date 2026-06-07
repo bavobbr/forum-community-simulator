@@ -18,6 +18,12 @@ Scrapes each inactive member's post history, feeds it to Gemini Pro, and builds 
 
 Instead of the CLI, you can ask a Gemini agent (e.g. Claude Desktop or your IDE) to autonomously build a persona. Using the **Build Persona Skill** (`.gemini/skills/build-persona`), the agent spawns subagents to read the forum via MCP tools, fetch thousands of posts, and construct the JSON profile inside its native context window.
 
+### Phase 1.6 — Agentic RAG Enrichment (Alternative)
+
+If you just want to expand the knowledge base of an existing persona without altering its core JSON profile, you can ask the agent to "enrich the RAG database". Using the **Enrich RAG Skill** (`.gemini/skills/enrich-rag`), the agent will find the oldest known post in the database and paginate backwards, saving new historical posts directly into the vector database.
+
+
+
 ### Phase 2 — Live Event (during the 24h window)
 
 Runs in one of two mutually exclusive modes set by `SANDBOX_THREAD_IDS`:
@@ -360,8 +366,17 @@ To use the MCP server, add it to your client's configuration (e.g. `claude_deskt
 ```
 
 The MCP Server exposes the following capabilities directly to LLMs:
-- **Tools:** `get_user_posts`, `get_thread_context`, `get_daily_activity`, `post_reply`
+- **Tools:** `get_user_posts`, `get_thread_context`, `get_daily_activity`, `post_reply`, `simulate_chat_turn`
 - **Resources:** `forum://memberlist/top100`, `forum://user/{id}/last_active`
+
+### RAG Server (`src/mcp/rag_server.py`)
+A secondary MCP server (`forum-rag-mcp`) is available to handle vector database operations for Retrieval-Augmented Generation context using ChromaDB and Gemini Embeddings.
+- **Tools:**
+  - `store_user_posts_in_db`: Embeds and indexes raw scraped JSON posts.
+  - `search_user_posts`: Performs semantic search against historical posts.
+  - `drop_user_posts`: Drops the ChromaDB collection for a user.
+  - `get_user_doc_counts`: Retrieves a summary dictionary of all indexed documents per username.
+  - `get_user_oldest_post_ts`: Returns the exact Unix timestamp of the oldest stored post for pagination.
 
 ---
 
@@ -372,6 +387,21 @@ The MCP Server exposes the following capabilities directly to LLMs:
 | Workbench | Persona analysis | `gemini-3.1-pro-preview` |
 | Workbench | Sample reply generation (previews) | `gemini-3.5-flash` |
 | Live event | Real-time reply generation | `gemini-3.5-flash` |
+
+---
+
+## Structured Reasoning (VAD Model)
+
+Before an alter ego replies, it must perform a structured reasoning step to determine its emotional state and conversational strategy. This is achieved using the Gemini API's `response_schema` feature, which enforces a strict JSON output via a Pydantic model.
+
+1. **Emotional Anchoring**: The model scores itself on the psychological **VAD scale** (1-10):
+   - **Valence**: Negative/Hostile (1) to Positive/Friendly (10)
+   - **Arousal**: Calm/Bored (1) to Excited/Furious (10)
+   - **Dominance**: Submissive/Reactive (1) to Authoritative/Proactive (10)
+2. **Cognitive Strategy**: The model explicitly writes out its analytical thoughts based on its relationship to the speaker, its pet peeves, and the VAD state.
+3. **Execution**: Finally, the model writes the actual `final_reply`.
+
+By forcing the LLM to mathematically commit to an emotional posture *before* writing text, we drastically reduce the "generic helpful AI" tone. The internal reasoning steps are logged locally to `logs/personas/{username}.log` and are stripped out before the reply reaches the forum review queue.
 
 ---
 

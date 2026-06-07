@@ -18,6 +18,24 @@ def _preprocess_content(tag: Tag) -> str:
             img.replace_with(alt)
         else:
             img.replace_with("[afbeelding]")
+            
+    # Wrap quotes in explicit markers so get_text() retains their boundaries
+    for quote_td in tag.find_all("td", class_="alt2"):
+        table = quote_td.find_parent("table")
+        if table and not getattr(table, "_marked_as_quote", False):
+            text = quote_td.get_text()
+            is_quote = ("Oorspronkelijk geplaatst door" in text or "Originally Posted by" in text)
+            
+            if not is_quote:
+                prev = table.find_previous_sibling("div")
+                if prev and ("Quote:" in prev.get_text() or "Citaat:" in prev.get_text()):
+                    is_quote = True
+                    
+            if is_quote:
+                table.insert_before("[CITAAT] ")
+                table.insert_after(" [/CITAAT] ")
+                table._marked_as_quote = True
+                
     return tag.get_text(separator=" ", strip=True)
 
 

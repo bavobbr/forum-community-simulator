@@ -21,7 +21,7 @@ load_dotenv()
 from src.session import VBulletinSession
 
 _DELAY = 3  # seconds between login attempts to avoid rate-limiting
-_DEFAULT_PERSONAS_DIR = "personas"
+_DEFAULT_PERSONAS_DIR = os.getenv("PERSONAS_DIR", "agent_personas")
 
 
 def main() -> None:

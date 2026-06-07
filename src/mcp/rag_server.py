@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from mcp.server.fastmcp import FastMCP
-from src.rag.db import store_posts, search_posts, drop_posts, get_user_post_counts
+from src.rag.db import store_posts, search_posts, drop_posts, get_user_post_counts, get_oldest_post_ts
 
 mcp = FastMCP("Forum RAG MCP")
 
@@ -70,6 +70,21 @@ def get_user_doc_counts() -> str:
     try:
         counts = get_user_post_counts()
         return json.dumps(counts, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+@mcp.tool()
+def get_user_oldest_post_ts(username: str) -> str:
+    """Return the timestamp of the oldest stored post for a user.
+    
+    Args:
+        username: The forum username.
+    """
+    try:
+        ts = get_oldest_post_ts(username)
+        if ts is None:
+            return json.dumps({"error": f"No posts found for {username} in the vector database."})
+        return json.dumps({"oldest_post_ts": ts})
     except Exception as e:
         return json.dumps({"error": str(e)})
 

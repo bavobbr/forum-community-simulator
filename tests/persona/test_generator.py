@@ -30,8 +30,9 @@ _TEST_POSTS = [
 
 
 def _make_mock_resp(text="Typische radje reply", finish_reason="STOP"):
+    import json
     resp = MagicMock()
-    resp.text = text
+    resp.text = json.dumps({"final_reply": text})
     resp.candidates[0].finish_reason.name = finish_reason
     return resp
 

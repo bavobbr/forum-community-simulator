@@ -1,6 +1,7 @@
 import os
 from google import genai
 from google.genai import types
+from pydantic import BaseModel
 
 _client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY", ""))
 
@@ -22,13 +23,18 @@ def call_llm(system: str, user: str, max_tokens: int) -> str:
     return resp.text
 
 
-def call_llm_raw(system: str, user: str, max_tokens: int, model: str = MODEL_FLASH):
+def call_llm_raw(system: str, user: str, max_tokens: int, model: str = MODEL_FLASH, response_schema: type[BaseModel] | dict | None = None):
+    config_args = {
+        "system_instruction": system,
+        "max_output_tokens": max_tokens,
+    }
+    if response_schema:
+        config_args["response_mime_type"] = "application/json"
+        config_args["response_schema"] = response_schema
+
     return _client.models.generate_content(
         model=model,
-        config=types.GenerateContentConfig(
-            system_instruction=system,
-            max_output_tokens=max_tokens,
-        ),
+        config=types.GenerateContentConfig(**config_args),
         contents=[user],
     )
 

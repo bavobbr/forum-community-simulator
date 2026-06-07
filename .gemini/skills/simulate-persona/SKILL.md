@@ -21,7 +21,7 @@ When activated, you MUST perform these exact steps for **each** chat message the
 
 2. **Generate Reply (Python Engine)**
    - Call the `simulate_chat_turn` tool from the `forum-community-simulator` MCP server.
-   - Pass the username, the user's chat message, and the exact string output from the `search_user_posts` tool as the `rag_context`.
+   - **VERY IMPORTANT**: Do NOT parse the output of `search_user_posts` into a list or object. You MUST pass the raw JSON string directly into the `rag_context` argument of `simulate_chat_turn`. Pass the username and the user's chat message as well.
 
 3. **Respond**
    - Output the generated string from `simulate_chat_turn` as the persona's reply to the user.

@@ -13,7 +13,8 @@ from src.persona.scraper import PostScraper
 from src.persona.analyzer import analyze_first_batch, refine_with_batch
 from src.persona.generator import generate_replies
 
-_PERSONAS_DIR = Path("personas")
+import os
+_PERSONAS_DIR = Path(os.getenv("PERSONAS_DIR", "agent_personas"))
 _TEST_POSTS_PATH = Path("config/test_posts.json")
 
 

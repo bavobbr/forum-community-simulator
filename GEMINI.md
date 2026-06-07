@@ -94,6 +94,7 @@ The project uses the new Google GenAI Python SDK (`google-genai`).
 - **Opinion Fingerprint Cap:** Between 25 and 50 items are captured inside `PersonaProfile.opinion_fingerprint`.
 - **Conversational Mechanics & Psychology:** Six deep behavioral parameters (`psychological_profile`, `signature_phrases`, `conflict_behavior`, `humor_and_sarcasm`, `pet_peeves`, `formatting_quirks`) strictly constrain how the generated replies are structured emotionally and physically. The `psychological_profile` specifically demands a highly structured, deep clinical analysis of 3-4 paragraphs.
 - **Interest Tags Cap:** Exactly 25 items are rigorously enforced and captured inside `PersonaProfile.interest_tags`.
+- **Structured Reasoning (VAD Model):** All live persona generation uses the Gemini `response_schema` feature with a Pydantic `GeneratedReply` model. Before writing its final reply, the LLM must first score its emotional state on a 1-10 scale using the VAD model (Valence, Arousal, Dominance) and justify its conversational strategy. These reasoning steps are parsed out, hidden from the forum, and logged locally to `logs/personas/{username}.log`.
 
 ---
 
@@ -164,6 +165,9 @@ The project features a suite of 180+ tests. Testing sets a dummy API key in `tes
 # Run all tests
 pytest
 
+# Run live integration tests (requires real GOOGLE_API_KEY in .env)
+pytest tests/integration/ -m integration
+
 # Run a specific test suite
 pytest tests/event/
 
@@ -186,6 +190,12 @@ As an alternative to the Python `workbench.py` CLI, AI agents can autonomously b
 - The agent will dynamically spawn a `DataCollector` subagent to paginate through the `get_user_posts` MCP tool and save raw posts to a scratch file.
 - It will then spawn a `PersonaAnalyzer` subagent to ingest the raw posts into its massive context window and generate the final structured JSON.
 - The resulting JSON is saved to the `agent_personas/` directory (which is safely gitignored to protect user data).
+
+### Agentic RAG Enrichment (via Gemini Skills)
+To expand an existing persona's knowledge base without altering their JSON profile, ask the agent to "enrich the RAG database". The agent uses the **Enrich RAG Skill** (`.gemini/skills/enrich-rag/SKILL.md`) to find the oldest stored post in ChromaDB and paginate backwards, saving posts directly into the vector database.
+
+### Agentic Persona Simulation (via Gemini Skills)
+To chat directly with an approved persona, ask the agent to "chat with [username]". The agent uses the **Simulate Persona Skill** (`.gemini/skills/simulate-persona/SKILL.md`) to orchestrate an interactive chat turn. It automatically retrieves historical context via the RAG MCP server and injects it into the rigorous Python-based generator prompt, ensuring the generated reply adheres perfectly to the persona's configured mechanics.
 
 ### Running the Orchestrator (Live Event)
 Runs the polling thread and launches the Flask local review UI.
@@ -223,6 +233,7 @@ A secondary MCP server (`forum-rag-mcp`) is available to handle vector database 
   - `search_user_posts`: Performs semantic search against historical posts.
   - `drop_user_posts`: Drops the ChromaDB collection for a user.
   - `get_user_doc_counts`: Retrieves a summary dictionary of all indexed documents per username.
+  - `get_user_oldest_post_ts`: Returns the exact Unix timestamp of the oldest stored post for pagination.
 
 ---
 

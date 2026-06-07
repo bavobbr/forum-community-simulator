@@ -40,7 +40,8 @@ def _is_image_only(content: str) -> bool:
 def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
                auto_approve_minutes, replies_per_cycle,
                sandbox_thread_ids: frozenset[int] | set[int] = frozenset(),
-               replies_per_post: int = 3):
+               replies_per_post: int = 3,
+               bypass_approval: bool = False):
     try:
         if sandbox_thread_ids:
             new_posts = fetch_sandbox_posts(scanner, sandbox_thread_ids)
@@ -139,9 +140,12 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
                                 post["post_id"], profile.reversed_username, exc)
                 continue
 
-        auto_approve_at = (
-            datetime.now(timezone.utc) + timedelta(minutes=auto_approve_minutes)
-        ).isoformat()
+        if bypass_approval:
+            auto_approve_at = datetime.now(timezone.utc).isoformat()
+        else:
+            auto_approve_at = (
+                datetime.now(timezone.utc) + timedelta(minutes=auto_approve_minutes)
+            ).isoformat()
 
         db.insert_pending(
             conn, post["post_id"], post["thread_id"], post["forum_id"],
@@ -164,6 +168,7 @@ def main():
     lookback_hours = int(os.getenv("LOOKBACK_HOURS", "48"))
     poll_interval = int(os.getenv("POLL_INTERVAL", "300"))
     auto_approve_minutes = int(os.getenv("AUTO_APPROVE_MINUTES", "10"))
+    bypass_approval = os.getenv("BYPASS_APPROVAL", "false").lower() == "true"
     replies_per_cycle = int(os.getenv("REPLIES_PER_CYCLE", "3"))
     sandbox_raw = os.getenv("SANDBOX_THREAD_IDS", "").strip()
     sandbox_thread_ids: set[int] = (
@@ -181,10 +186,11 @@ def main():
         logging.info("FORUM-WIDE MODE")
     alter_password = os.getenv("ALTER_PASSWORD")
 
-    profiles = _load_profiles("personas")
+    personas_dir = os.getenv("PERSONAS_DIR", "agent_personas")
+    profiles = _load_profiles(personas_dir)
     if not profiles:
-        raise SystemExit("No approved personas found in personas/")
-    logging.info("Loaded %d approved personas", len(profiles))
+        raise SystemExit(f"No approved personas found in {personas_dir}/")
+    logging.info("Loaded %d approved personas from %s", len(profiles), personas_dir)
 
     conn = db.init_db("event.db")
 
@@ -212,7 +218,8 @@ def main():
         _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
                    auto_approve_minutes, replies_per_cycle,
                    sandbox_thread_ids=sandbox_thread_ids,
-                   replies_per_post=replies_per_post)
+                   replies_per_post=replies_per_post,
+                   bypass_approval=bypass_approval)
 
         for entry in db.get_pending_auto_approve(conn):
             logging.info("Auto-approving reply %d for %s", entry["id"], entry["alter_username"])

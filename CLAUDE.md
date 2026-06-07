@@ -126,6 +126,21 @@ Rich markup escaping (`rich.markup.escape`) is applied to all LLM-generated text
 
 `workbench.py` configures `logging.basicConfig(level=logging.INFO, format="%(message)s")` so progress messages from the scraper (e.g. `full content: 25/200 posts`) are visible during interactive use.
 
+## Agentic Capabilities (via Skills)
+
+### Agentic Persona Builder (via Skills)
+As an alternative to the Python `workbench.py` CLI, AI agents can autonomously build personas using the **Build Persona Skill** (`.gemini/skills/build-persona/SKILL.md`).
+- Just ask the agent to *"build a persona for username X"*.
+- The agent will dynamically spawn a `DataCollector` subagent to paginate through the `get_user_posts` MCP tool and save raw posts to a scratch file.
+- It will then spawn a `PersonaAnalyzer` subagent to ingest the raw posts into its massive context window and generate the final structured JSON.
+- The resulting JSON is saved to the `agent_personas/` directory (which is safely gitignored to protect user data).
+
+### Agentic RAG Enrichment (via Skills)
+To expand an existing persona's knowledge base without altering their JSON profile, ask the agent to "enrich the RAG database". The agent uses the **Enrich RAG Skill** (`.gemini/skills/enrich-rag/SKILL.md`) to find the oldest stored post in ChromaDB and paginate backwards, saving posts directly into the vector database.
+
+### Agentic Persona Simulation (via Skills)
+To chat directly with an approved persona, ask the agent to "chat with [username]". The agent uses the **Simulate Persona Skill** (`.gemini/skills/simulate-persona/SKILL.md`) to orchestrate an interactive chat turn. It automatically retrieves historical context via the RAG MCP server and injects it into the rigorous Python-based generator prompt, ensuring the generated reply adheres perfectly to the persona's configured mechanics.
+
 ## Forum scraping facts
 
 - VBulletin requires MD5 password hashing (`vb_login_md5password` field), not plain text

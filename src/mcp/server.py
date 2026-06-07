@@ -133,30 +133,59 @@ def get_thread_context(post_id: int, n: int = 5) -> str:
 
 
 @mcp.tool()
-def format_persona_prompt(username: str, filepath: str) -> str:
-    """Reads a scratch JSON file of posts and builds the exact prompt string for Persona analysis.
+def analyze_persona_from_file(username: str, filepath: str) -> str:
+    """Reads a scratch JSON file of posts and builds the AI persona using the internal Python LLM SDK.
     
     Args:
         username: The forum username being analyzed.
         filepath: Absolute path to the scratch JSON file containing the raw posts.
     """
+    from src.persona.analyzer import analyze_first_batch
+    import json
+    from pathlib import Path
+    
     with open(filepath, 'r', encoding='utf-8') as f:
         data = json.load(f)
         
-    # Handle both wrapped {"posts": [...]} and raw array [...]
     posts = data.get("posts", []) if isinstance(data, dict) else data
-        
-    posts_text = _format_posts(posts)
     
-    prompt = (
-        f"Analyseer de volgende {len(posts)} forumberichten van gebruiker "
-        f'"{username}".\n\n'
-        f"Berichten:\n{posts_text}\n\n"
-        f"Geef een JSON object terug met dit schema:\n{_SCHEMA_DESCRIPTION}\n\n"
-        f"Beperk opinion_fingerprint tot maximaal 25 items — maak ze concreet en bruikbaar als debatpunten. "
-        f"Geef enkel het JSON object terug, geen uitleg."
-    )
-    return prompt
+    alter = None
+    approved_accounts_path = Path("config/approved_accounts.json")
+    if approved_accounts_path.exists():
+        try:
+            with open(approved_accounts_path, 'r', encoding='utf-8') as f:
+                accounts = json.load(f)
+                for a in accounts:
+                    if a.get("original_username", "").lower() == username.lower():
+                        alter = a
+                        break
+        except Exception:
+            pass
+            
+    if not alter:
+        alter = {
+            "user_id": 0,
+            "original_username": username,
+            "reversed_username": username[::-1],
+            "post_count": len(posts),
+            "last_active": ""
+        }
+        
+    # Analyze ALL posts in one single batch (utilizing the large context window of Gemini 1.5 Pro)
+    profile = analyze_first_batch(alter, posts)
+    
+    out_path = filepath.replace("_raw.json", "_llm.json")
+    if "_raw.json" not in filepath:
+        out_path = filepath + ".llm.json"
+        
+    with open(out_path, 'w', encoding='utf-8') as f:
+        f.write(json.dumps(profile.to_dict(), ensure_ascii=False, indent=2))
+    
+    return json.dumps({
+        "status": "success",
+        "saved_to": out_path,
+        "persona_summary": profile.persona_summary
+    }, ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
@@ -220,7 +249,7 @@ def save_approved_persona(username: str, llm_file: str, raw_posts_file: str, use
     profile.example_posts = _select_examples(posts)
     profile.is_approved = True
     
-    save_dir = Path("agent_personas")
+    save_dir = Path(os.getenv("PERSONAS_DIR", "agent_personas"))
     save_dir.mkdir(exist_ok=True)
     
     safe_name = re.sub(r'[^\w\-]', '_', username)
@@ -275,45 +304,74 @@ def get_user_last_active(user_id: int) -> str:
 
 
 @mcp.tool()
-def simulate_chat_turn(username: str, message: str, rag_context: str | None = None) -> str:
+def simulate_chat_turn(username: str, message: str, rag_context: list | str | None = None, ctx: Context = None) -> str:
     """Simulates a chat turn by generating a reply as the persona.
+    
+    CRITICAL INSTRUCTION FOR AI AGENTS: 
+    Do NOT call this tool directly without first calling `search_user_posts` from `forum-rag-mcp` to get historical context. 
+    You MUST pass the raw JSON string output from `search_user_posts` into the `rag_context` argument.
     
     Args:
         username: The forum username of the persona.
         message: The chat message from the user.
-        rag_context: JSON string containing a list of historical posts retrieved from RAG.
+        rag_context: REQUIRED historical posts retrieved from RAG. Can be a JSON string or parsed list.
     """
     import json
     import re
+    import logging
     from pathlib import Path
     from src.persona.models import PersonaProfile
     from src.persona.generator import generate_chat_reply
 
     safe_name = re.sub(r'[^\w\-]', '_', username)
-    profile_path = Path("agent_personas") / f"{safe_name}.json"
+    profile_path = Path(os.getenv("PERSONAS_DIR", "agent_personas")) / f"{safe_name}.json"
     
     if not profile_path.exists():
-        return f"Error: Persona profile not found at {profile_path}"
+        msg = f"Error: Persona profile not found at {profile_path}"
+        if ctx: ctx.info(msg)
+        return msg
         
     try:
         with open(profile_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         profile = PersonaProfile.from_dict(data)
     except Exception as e:
-        return f"Error loading persona profile: {e}"
+        msg = f"Error loading persona profile: {e}"
+        if ctx: ctx.info(msg)
+        return msg
 
     context_list = []
     if rag_context:
-        try:
-            parsed = json.loads(rag_context)
-            if isinstance(parsed, list):
-                context_list = parsed
-            elif isinstance(parsed, dict) and "documents" in parsed:
-                context_list = [{"content": doc} for doc in parsed.get("documents", [])]
-        except Exception as e:
-            return f"Error parsing rag_context: {e}"
+        if isinstance(rag_context, list):
+            context_list = rag_context
+        elif isinstance(rag_context, str):
+            try:
+                parsed = json.loads(rag_context)
+                if isinstance(parsed, list):
+                    context_list = parsed
+                elif isinstance(parsed, dict) and "documents" in parsed:
+                    context_list = [{"content": doc} for doc in parsed.get("documents", [])]
+            except Exception as e:
+                msg = f"Error parsing rag_context: {e}"
+                if ctx: ctx.info(msg)
+                return msg
 
-    return generate_chat_reply(profile, message, rag_context=context_list)
+    reply = generate_chat_reply(profile, message, rag_context=context_list)
+    
+    log_msg = (
+        f"\n=== SIMULATE CHAT TURN ===\n"
+        f"Username: {username}\n"
+        f"Message: {message}\n"
+        f"RAG Context Items: {len(context_list)}\n"
+        f"Generated Reply: {reply}\n"
+        f"==========================\n"
+    )
+    logging.info(log_msg)
+    if ctx:
+        ctx.info(log_msg)
+
+    return reply
+
 
 
 if __name__ == "__main__":

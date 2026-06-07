@@ -1,6 +1,9 @@
+import json
 import logging
+from pathlib import Path
+from datetime import datetime
 from src.llm import call_llm_raw, MODEL_FLASH
-from src.persona.models import PersonaProfile
+from src.persona.models import PersonaProfile, GeneratedReply
 
 
 def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = None) -> str:
@@ -77,12 +80,15 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
         f"Gebruik deze voorbeeldberichten UITSLUITEND om je Schrijfstijl, opmaak en toon te bepalen:\n"
         f"{examples}\n\n"
         f"## Regels\n"
+        f"- Let op: Tekst tussen [CITAAT] en [/CITAAT] is eerdere context die de afzender aanhaalt. Je reageert op de daadwerkelijke reactie van de auteur buiten dit citaat.\n"
         f"- Schrijf ALTIJD in het Nederlands\n"
         f"- Blijf in karakter — geen vierde muur doorbreken\n"
         f"- Verzin geen biografische feiten\n"
         f"- Bij een onbekend onderwerp: redeneer vanuit de wereldvisie en retorische patronen hierboven\n"
         f"- Je mag VBulletin BBCode gebruiken (b, i, quote, url) als het bij de stijl past\n"
-        f"- Gebruik uitsluitend deze smiliecodes als je een smilie wil plaatsen: "
+        f"- OVERDRIJF NIET met smilies. Sluit je bericht NIET standaard af met een smilie.\n"
+        f"- Gebruik smilies uitsluitend als dit expliciet past bij de persoonlijkheid of formatting_quirks van dit profiel.\n"
+        f"- Als je een smilie plaatst, gebruik uitsluitend deze codes: "
         f":) :-) ;-) :p ;p :'( :( 8=) 8-) :teeth: ;D :o :x :love: :rolleyes: :? ;) D:\n"
         f"- Schrijf smilies uitsluitend als één van de codes hierboven — nooit als woorden tussen haakjes\n"
         f"- Dit is een hechte community — de standaardtoon is warm, betrokken en enthousiast\n"
@@ -90,7 +96,19 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
         f"- Sarcasme, cynisme of directe kritiek zijn alleen gepast als het écht bij de persoonlijkheid past én de situatie er expliciet om vraagt — schrijf dit nooit als standaardreactie\n"
         f"- Zelfs een kritische of nuchtere persoon kan warmte en humor tonen; niet elke mening hoeft als aanval te klinken\n"
         f"- Reageer kort als de persoon kort schrijft, lang als de persoon lang schrijft\n"
-        f"- Voeg GEEN externe URLs of links toe — deze zijn vaak fout of dood"
+        f"- Voeg GEEN externe URLs of links toe — deze zijn vaak fout of dood\n\n"
+        f"## Verplichte Werkwijze (Structured Reasoning)\n"
+        f"Je antwoord MOET een strict JSON object zijn dat je gedachtegang en je emotionele staat vastlegt voordat je reageert.\n\n"
+        f"Bepaal eerst je emotionele staat via het VAD-model (schaal 1-10):\n"
+        f"- Valence: 1 (extreem negatief/vijandig) tot 10 (extreem positief/vriendelijk).\n"
+        f"- Arousal: 1 (extreem kalm/verveeld) tot 10 (extreem opgewonden/woedend/hyper).\n"
+        f"- Dominance: 1 (onderdanig/reagerend) tot 10 (zeer dominant/sturend).\n\n"
+        f"Volg daarna deze denkstappen:\n"
+        f"1. 'analysis': Analyseer het bericht op basis van je VAD scores. Raakt dit een pet peeve?\n"
+        f"2. 'core_message': Wat is de feitelijke boodschap die je wilt overbrengen?\n"
+        f"3. 'style_strategy': Hoe ga je dit verwoorden (stopwoorden, dialect, opmaak) om je VAD-emotie te weerspiegelen?\n"
+        f"4. 'final_reply': Schrijf direct hierna je uiteindelijke forumreactie.\n\n"
+        f"Geef uitsluitend het gevraagde JSON object terug."
     )
 
 
@@ -103,14 +121,14 @@ def generate_replies(profile: PersonaProfile, test_posts: list[dict]) -> list[di
             f"Forum: {test_post['forum']} | Thread: {test_post['thread_title']}\n\n"
             f"[Reageer op dit bericht:]\n"
             f"\"{test_post['post']}\"\n\n"
-            f"Schrijf één forumreactie zoals {profile.reversed_username} dat zou doen. "
+            f"Schrijf één forumreactie zoals {profile.original_username} dat zou doen. "
             f"Schrijf alleen de reactietekst zelf — geen uitleg, geen opmaak, geen opsomming. "
             f"Citeer de post NIET."
         )
         try:
-            resp = call_llm_raw(system, user_content, 2048, model=MODEL_FLASH)
-            reply = resp.text
-            if resp.candidates[0].finish_reason.name == "MAX_TOKENS":
+            resp = call_llm_raw(system, user_content, 2048, model=MODEL_FLASH, response_schema=GeneratedReply)
+            reply = _parse_and_log_reply(profile, resp.text)
+            if resp.candidates and resp.candidates[0].finish_reason.name == "MAX_TOKENS":
                 reply += " [afgekapt]"
         except Exception as exc:
             logging.warning("generate_replies failed for post %r: %s", test_post.get("id"), exc)
@@ -131,15 +149,57 @@ def generate_chat_reply(profile: PersonaProfile, message: str, rag_context: list
     user_content = (
         f"[Reageer op dit chatbericht als {profile.original_username}:]\n"
         f"\"{message}\"\n\n"
-        f"Schrijf één reactie zoals {profile.reversed_username} dat zou doen. "
         f"Schrijf alleen de reactietekst zelf — geen uitleg, geen opmaak, geen opsomming."
     )
+    
     try:
-        resp = call_llm_raw(system, user_content, 2048, model=MODEL_FLASH)
-        reply = resp.text
-        if resp.candidates[0].finish_reason.name == "MAX_TOKENS":
+        with open("last_chat_prompt.txt", "w", encoding="utf-8") as f:
+            f.write("=== SYSTEM PROMPT ===\n")
+            f.write(system)
+            f.write("\n\n=== USER CONTENT ===\n")
+            f.write(user_content)
+    except Exception as e:
+        logging.warning("Could not save last_chat_prompt.txt: %s", e)
+
+    try:
+        resp = call_llm_raw(system, user_content, 2048, model=MODEL_FLASH, response_schema=GeneratedReply)
+        reply = _parse_and_log_reply(profile, resp.text)
+        if resp.candidates and resp.candidates[0].finish_reason.name == "MAX_TOKENS":
             reply += " [afgekapt]"
         return reply
     except Exception as exc:
         logging.warning("generate_chat_reply failed for user %r: %s", profile.original_username, exc)
         return "[generatie mislukt]"
+
+
+def _parse_and_log_reply(profile: PersonaProfile, resp_text: str) -> str:
+    try:
+        data = json.loads(resp_text)
+        
+        log_dir = Path("logs/personas")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / f"{profile.original_username}.log"
+        
+        timestamp = datetime.now().isoformat()
+        log_entry = {
+            "timestamp": timestamp,
+            "vad": {
+                "valence": data.get("valence"),
+                "arousal": data.get("arousal"),
+                "dominance": data.get("dominance")
+            },
+            "reasoning": {
+                "analysis": data.get("analysis"),
+                "core_message": data.get("core_message"),
+                "style_strategy": data.get("style_strategy")
+            },
+            "final_reply": data.get("final_reply")
+        }
+        
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+            
+        return data.get("final_reply", "[generatie mislukt: geen final_reply in JSON]")
+    except Exception as e:
+        logging.error(f"Failed to parse or log GeneratedReply JSON: {e}\nRaw text: {resp_text}")
+        return "[generatie mislukt: ongeldige JSON]"

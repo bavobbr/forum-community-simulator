@@ -29,7 +29,6 @@ _MOCK_ANALYSIS_RESPONSE = {
     "dialect_markers": ["ge", "ni", "da", "wss"],
     "formality": "very_casual",
     "sentence_length": "short",
-    "bbcode_habits": [],
     "punctuation_style": "weinig hoofdletters, geen punt op het einde",
     "topic_weights": {"Videogames": 0.8, "Zwam": 0.6},
     "opinion_fingerprint": ["sceptisch over hype", "direct in taal"],
