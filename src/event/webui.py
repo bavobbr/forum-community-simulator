@@ -139,15 +139,19 @@ def _do_approve(conn, entry: dict, alter_password: str, live_mode: bool, profile
     if profile_map:
         profile = profile_map.get(entry["alter_username"])
         if profile:
-            now_check = datetime.now(timezone.utc)
-            hour_key = now_check.strftime("%Y-%m-%dT%H")
-            cutoff = (now_check - timedelta(hours=24)).strftime("%Y-%m-%dT%H")
-            hourly = db.get_hourly_count(conn, entry["alter_username"], hour_key)
-            daily = db.get_daily_count(conn, entry["alter_username"], cutoff)
-            if hourly >= profile.hourly_cap or daily >= profile.daily_cap:
-                logging.info("Rate cap reached for %s at approval time, discarding", entry["alter_username"])
-                db.update_status(conn, entry["id"], "discarded")
-                return False
+            sandbox_raw = os.getenv("SANDBOX_THREAD_IDS", "").strip()
+            sandbox_thread_ids = {int(x.strip()) for x in sandbox_raw.split(",") if x.strip()}
+            
+            if entry["thread_id"] not in sandbox_thread_ids:
+                now_check = datetime.now(timezone.utc)
+                hour_key = now_check.strftime("%Y-%m-%dT%H")
+                cutoff = (now_check - timedelta(hours=24)).strftime("%Y-%m-%dT%H")
+                hourly = db.get_hourly_count(conn, entry["alter_username"], hour_key)
+                daily = db.get_daily_count(conn, entry["alter_username"], cutoff)
+                if hourly >= profile.hourly_cap or daily >= profile.daily_cap:
+                    logging.info("Rate cap reached for %s at approval time, discarding", entry["alter_username"])
+                    db.update_status(conn, entry["id"], "discarded")
+                    return False
 
     if live_mode:
         success = poster.post_reply(
