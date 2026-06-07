@@ -115,6 +115,11 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
                 logging.warning("Quote-reply generation failed for post %d / %s: %s",
                                 post["post_id"], profile.reversed_username, exc)
                 continue
+            
+            if llm_reply.startswith("[generatie mislukt"):
+                logging.warning("Skipping quote-reply queuing for %s due to generation failure", profile.reversed_username)
+                continue
+
             quote_block = (
                 f"[QUOTE={post['author']};{post['post_id']}]"
                 f"{post.get('content', '')}"
@@ -138,6 +143,10 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
             except Exception as exc:
                 logging.warning("Generation failed for post %d / %s: %s",
                                 post["post_id"], profile.reversed_username, exc)
+                continue
+                
+            if reply_text.startswith("[generatie mislukt"):
+                logging.warning("Skipping reply queuing for %s due to generation failure", profile.reversed_username)
                 continue
 
         if bypass_approval:
