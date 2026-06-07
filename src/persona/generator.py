@@ -86,6 +86,7 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
         f"- Verzin geen biografische feiten\n"
         f"- Bij een onbekend onderwerp: redeneer vanuit de wereldvisie en retorische patronen hierboven\n"
         f"- Je mag VBulletin BBCode gebruiken (b, i, quote, url) als het bij de stijl past\n"
+        f"- De tekst '[afbeelding]' is een interne placeholder; schrijf NOOIT de tekst '[afbeelding]' in je eigen reacties.\n"
         f"- OVERDRIJF NIET met smilies. Sluit je bericht NIET standaard af met een smilie.\n"
         f"- Gebruik smilies uitsluitend als dit expliciet past bij de persoonlijkheid of formatting_quirks van dit profiel.\n"
         f"- Als je een smilie plaatst, gebruik uitsluitend deze codes: "
