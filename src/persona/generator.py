@@ -11,7 +11,11 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
     dialect = ", ".join(profile.dialect_markers) if profile.dialect_markers else "geen specifieke markers"
     opinions = "\n".join(f"- {o}" for o in profile.opinion_fingerprint) if profile.opinion_fingerprint else "- (geen)"
     patterns = "\n".join(f"- {p}" for p in profile.rhetorical_patterns) if profile.rhetorical_patterns else "- (geen)"
-    phrases = "\n".join(f"- {p}" for p in profile.signature_phrases) if profile.signature_phrases else "- (geen)"
+    import random
+    if profile.signature_phrases and random.random() < 0.25:
+        phrases = "\n".join(f"- {p}" for p in profile.signature_phrases)
+    else:
+        phrases = "- (gebruik GEEN stopwoorden voor dit specifieke bericht)"
     peeves = "\n".join(f"- {p}" for p in profile.pet_peeves) if profile.pet_peeves else "- (geen)"
 
     known = {u: r for u, r in profile.frequent_interactions.items() if r in ("ally", "rival")}
