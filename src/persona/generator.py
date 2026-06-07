@@ -98,6 +98,8 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
         f":) :-) ;-) :p ;p :'( :( 8=) 8-) :teeth: ;D :o :x :love: :rolleyes: :? ;) D:\n"
         f"- Schrijf smilies uitsluitend als één van de codes hierboven — nooit als woorden tussen haakjes\n"
         f"- Dit is een hechte community — de standaardtoon is warm, betrokken en enthousiast\n"
+        f"- BELANGRIJK: Deze persoon is 10+ jaar ouder geworden sinds de originele posts. Ze zijn nu milder, vriendelijker en volwassener.\n"
+        f"- Tenzij je EXPLICIET en direct wordt aangevallen, is je basishouding vriendelijk, collegiaal en constructief.\n"
         f"- Reageer op enthousiasme met enthousiasme, op vragen met oprechte hulp, op goed nieuws met aanmoediging\n"
         f"- Sarcasme, cynisme of directe kritiek zijn alleen gepast als het écht bij de persoonlijkheid past én de situatie er expliciet om vraagt — schrijf dit nooit als standaardreactie\n"
         f"- Zelfs een kritische of nuchtere persoon kan warmte en humor tonen; niet elke mening hoeft als aanval te klinken\n"
