@@ -105,7 +105,7 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
         f"- Valence: 1 (extreem negatief/vijandig) tot 10 (extreem positief/vriendelijk).\n"
         f"- Arousal: 1 (extreem kalm/verveeld) tot 10 (extreem opgewonden/woedend/hyper).\n"
         f"- Dominance: 1 (onderdanig/reagerend) tot 10 (zeer dominant/sturend).\n\n"
-        f"Volg daarna deze denkstappen:\n"
+        f"Volg daarna deze denkstappen (houd deze zeer kort, max 1-2 zinnen per stap):\n"
         f"1. 'analysis': Analyseer het bericht op basis van je VAD scores. Raakt dit een pet peeve?\n"
         f"2. 'core_message': Wat is de feitelijke boodschap die je wilt overbrengen?\n"
         f"3. 'style_strategy': Hoe ga je dit verwoorden (stopwoorden, dialect, opmaak) om je VAD-emotie te weerspiegelen?\n"
@@ -128,7 +128,7 @@ def generate_replies(profile: PersonaProfile, test_posts: list[dict]) -> list[di
             f"Citeer de post NIET."
         )
         try:
-            resp = call_llm_raw(system, user_content, 2048, model=MODEL_FLASH, response_schema=GeneratedReply)
+            resp = call_llm_raw(system, user_content, 8192, model=MODEL_FLASH, response_schema=GeneratedReply)
             reply = _parse_and_log_reply(profile, resp.text)
             if resp.candidates and resp.candidates[0].finish_reason.name == "MAX_TOKENS":
                 reply += " [afgekapt]"
@@ -164,7 +164,7 @@ def generate_chat_reply(profile: PersonaProfile, message: str, rag_context: list
         logging.warning("Could not save last_chat_prompt.txt: %s", e)
 
     try:
-        resp = call_llm_raw(system, user_content, 2048, model=MODEL_FLASH, response_schema=GeneratedReply)
+        resp = call_llm_raw(system, user_content, 8192, model=MODEL_FLASH, response_schema=GeneratedReply)
         reply = _parse_and_log_reply(profile, resp.text)
         if resp.candidates and resp.candidates[0].finish_reason.name == "MAX_TOKENS":
             reply += " [afgekapt]"

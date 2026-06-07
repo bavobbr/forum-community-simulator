@@ -32,7 +32,7 @@ def generate_reply(
         f"Citeer de post NIET."
     )
 
-    resp = call_llm_raw(system, user_content, 2048, response_schema=GeneratedReply)
+    resp = call_llm_raw(system, user_content, 8192, response_schema=GeneratedReply)
     reply = _parse_and_log_reply(profile, resp.text)
     if resp.candidates and resp.candidates[0].finish_reason.name == "MAX_TOKENS":
         reply += " [afgekapt]"
@@ -53,7 +53,7 @@ def generate_quote_reply(profile: PersonaProfile, triggering_post: dict) -> str:
         f"Citeer de post NIET."
     )
 
-    resp = call_llm_raw(system, user_content, 2048, response_schema=GeneratedReply)
+    resp = call_llm_raw(system, user_content, 8192, response_schema=GeneratedReply)
     reply = _parse_and_log_reply(profile, resp.text)
     if resp.candidates and resp.candidates[0].finish_reason.name == "MAX_TOKENS":
         reply += " [afgekapt]"
