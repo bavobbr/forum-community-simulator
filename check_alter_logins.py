@@ -2,13 +2,17 @@
 Verify that every alter ego account can log in with the shared ALTER_PASSWORD.
 
 Run from project root:
-    python check_alter_logins.py
+    python check_alter_logins.py [persona_dir]
 
-Reads accounts from personas/*.json (ground truth for actual registered names)
-and ALTER_PASSWORD from .env. Prints OK / FAIL per account and a summary.
+persona_dir defaults to "personas"; pass "agent_personas" to check the
+MCP-generated profiles instead.
+
+Reads accounts from {persona_dir}/*.json (ground truth for actual registered
+names) and ALTER_PASSWORD from .env. Prints OK / FAIL per account and a summary.
 """
 import json
 import os
+import sys
 import time
 
 from dotenv import load_dotenv
@@ -17,23 +21,29 @@ load_dotenv()
 from src.session import VBulletinSession
 
 _DELAY = 3  # seconds between login attempts to avoid rate-limiting
-_PERSONAS_DIR = "personas"
+_DEFAULT_PERSONAS_DIR = "personas"
 
 
 def main() -> None:
+    personas_dir = sys.argv[1] if len(sys.argv) > 1 else _DEFAULT_PERSONAS_DIR
+
     alt_password = os.getenv("ALTER_PASSWORD", "")
     if not alt_password:
         print("ERROR: ALTER_PASSWORD not set in .env")
         return
 
-    persona_files = sorted(f for f in os.listdir(_PERSONAS_DIR) if f.endswith(".json"))
+    if not os.path.isdir(personas_dir):
+        print(f"ERROR: directory not found: {personas_dir}/")
+        return
+
+    persona_files = sorted(f for f in os.listdir(personas_dir) if f.endswith(".json"))
     if not persona_files:
-        print(f"No persona files found in {_PERSONAS_DIR}/")
+        print(f"No persona files found in {personas_dir}/")
         return
 
     accounts = []
     for fname in persona_files:
-        with open(os.path.join(_PERSONAS_DIR, fname)) as f:
+        with open(os.path.join(personas_dir, fname)) as f:
             d = json.load(f)
         accounts.append({
             "original_username": d.get("original_username", fname),
