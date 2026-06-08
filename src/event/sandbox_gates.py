@@ -2,7 +2,7 @@ import random
 import sqlite3
 
 from src.persona.models import PersonaProfile
-from src.event.gates import _passes_rate_cap
+from src.event.gates import _passes_rate_cap, is_meaningful
 
 _MAX_TRIGGERED = 3
 
@@ -30,10 +30,13 @@ def evaluate_post_sandbox(
     all_reversed = {p.reversed_username for p in profiles}
     if post.get("author", "") in all_reversed:
         return []
-
+        
     triggered = _find_triggered(post, profiles)
     if triggered:
         return [(p, 1.0) for p in triggered[:_MAX_TRIGGERED]]
+
+    if not is_meaningful(post):
+        return []
 
     eligible = [p for p in profiles if _passes_rate_cap(p, conn)]
     sample = random.sample(eligible, min(replies_per_post, len(eligible)))
