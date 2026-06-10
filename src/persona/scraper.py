@@ -41,8 +41,18 @@ def _extract_post_content(html: str, post_id: int) -> str | None:
     for quote_td in msg.find_all("td", class_="alt2"):
         table = quote_td.find_parent("table")
         if table and not getattr(table, "_marked_as_quote", False):
-            text = quote_td.get_text()
-            is_quote = ("Oorspronkelijk geplaatst door" in text or "Originally Posted by" in text)
+            author_name = ""
+            header_div = None
+            for div in quote_td.find_all("div", recursive=False):
+                div_text = div.get_text()
+                if "Oorspronkelijk geplaatst door" in div_text or "Originally Posted by" in div_text:
+                    header_div = div
+                    strong = div.find("strong")
+                    if strong:
+                        author_name = strong.get_text(strip=True)
+                    break
+                    
+            is_quote = (header_div is not None)
             
             if not is_quote:
                 prev = table.find_previous_sibling("div")
@@ -50,7 +60,17 @@ def _extract_post_content(html: str, post_id: int) -> str | None:
                     is_quote = True
                     
             if is_quote:
-                table.insert_before("[CITAAT] ")
+                # Remove the "Quote:" / "Citaat:" label above the table
+                prev = table.find_previous_sibling("div")
+                if prev and ("Quote:" in prev.get_text() or "Citaat:" in prev.get_text()):
+                    prev.decompose()
+                
+                # Remove the header div (Originally Posted by X View Post)
+                if header_div:
+                    header_div.decompose()
+                
+                citaat_tag = f'[CITAAT="{author_name}"] ' if author_name else "[CITAAT] "
+                table.insert_before(citaat_tag)
                 table.insert_after(" [/CITAAT] ")
                 table._marked_as_quote = True
                 
@@ -184,8 +204,6 @@ class PostScraper:
             n = i + 1
             if self.progress_cb:
                 self.progress_cb(post["post_id"], n, total)
-            if n % 25 == 0 or n == total:
-                _log.info("  full content: %d/%d posts", n, total)
         return enriched
 
     def fetch_batch(self, user_id: int, page: int = 1) -> tuple[list[dict], bool]:

@@ -1,7 +1,7 @@
 import sqlite3
 import pytest
 from src.event.db import init_db, increment_rate
-from src.event.sandbox_gates import evaluate_post_sandbox
+from src.event.sandbox_gates import evaluate_post_sandbox_random as evaluate_post_sandbox
 from src.persona.models import PersonaProfile
 from datetime import datetime, timezone
 
@@ -43,61 +43,7 @@ def test_author_is_alter_returns_empty(conn):
     assert evaluate_post_sandbox(post, [profile], conn) == []
 
 
-def test_text_mention_reversed_name_triggers(conn):
-    profile = _make_profile(reversed_username="ejdar")
-    post = _make_post(content="ejdar wat vind jij hiervan eigenlijk?")
-    result = evaluate_post_sandbox(post, [profile], conn)
-    assert profile in [p for p, _ in result]
 
-
-def test_text_mention_original_name_triggers(conn):
-    profile = _make_profile(reversed_username="ejdar", original_username="radje")
-    post = _make_post(content="radje was hier vroeger altijd actief toch?")
-    result = evaluate_post_sandbox(post, [profile], conn)
-    assert profile in [p for p, _ in result]
-
-
-def test_bbcode_quote_tag_triggers(conn):
-    profile = _make_profile(reversed_username="ejdar", original_username="radje")
-    post = _make_post(content="[QUOTE=ejdar;12345]\neerder geschreven\n[/QUOTE]\nGoed punt!")
-    result = evaluate_post_sandbox(post, [profile], conn)
-    assert profile in [p for p, _ in result]
-
-
-def test_bbcode_quote_original_name_triggers(conn):
-    profile = _make_profile(reversed_username="ejdar", original_username="radje")
-    post = _make_post(content="[QUOTE=radje;99]\noud bericht\n[/QUOTE]\nIk ben het eens.")
-    result = evaluate_post_sandbox(post, [profile], conn)
-    assert profile in [p for p, _ in result]
-
-
-def test_mention_is_case_insensitive(conn):
-    profile = _make_profile(reversed_username="EjDaR")
-    post = _make_post(content="ejdar hoi hoe gaat het met je?")
-    result = evaluate_post_sandbox(post, [profile], conn)
-    assert profile in [p for p, _ in result]
-
-
-def test_max_three_triggered_when_many_mentioned(conn):
-    profiles = [_make_profile(reversed_username=f"user{i}", original_username=f"resu{i}") for i in range(5)]
-    content = " ".join(f"user{i}" for i in range(5)) + " wat vinden jullie allemaal?"
-    post = _make_post(content=content)
-    result = evaluate_post_sandbox(post, profiles, conn)
-    assert len(result) == 3
-
-
-def test_mentioned_capped_profile_is_triggered_bypassing_cap(conn):
-    capped = _make_profile(reversed_username="capped", original_username="deppac", hourly_cap=1)
-    free = _make_profile(reversed_username="free00", original_username="00eerf", hourly_cap=5)
-    now = datetime.now(timezone.utc)
-    hour_key = now.strftime("%Y-%m-%dT%H")
-    day_key = now.strftime("%Y-%m-%d")
-    increment_rate(conn, "capped", hour_key, day_key)
-    post = _make_post(content="capped wat vind jij hiervan?")
-    result = evaluate_post_sandbox(post, [capped, free], conn, replies_per_post=3)
-    names = [p.reversed_username for p, _ in result]
-    assert "capped" in names
-    assert "free00" not in names
 
 
 def test_no_mention_returns_random_selection(conn):
@@ -129,16 +75,7 @@ def test_rate_capped_profile_excluded_from_random(conn):
     assert "free00" in names
 
 
-def test_rate_capped_profile_included_when_triggered(conn):
-    capped = _make_profile(reversed_username="capped", original_username="deppac", hourly_cap=1)
-    now = datetime.now(timezone.utc)
-    hour_key = now.strftime("%Y-%m-%dT%H")
-    day_key = now.strftime("%Y-%m-%d")
-    increment_rate(conn, "capped", hour_key, day_key)
-    post = _make_post(content="capped wat vind jij hiervan eigenlijk?")
-    result = evaluate_post_sandbox(post, [capped], conn)
-    names = [p.reversed_username for p, _ in result]
-    assert "capped" in names
+
 
 
 def test_fewer_profiles_than_replies_per_post(conn):

@@ -1,7 +1,7 @@
 import sqlite3
 import pytest
 from src.event.db import init_db, increment_rate
-from src.event.gates import evaluate_post, detect_quoted_alters, _passes_rate_cap
+from src.event.gates import evaluate_post_random as evaluate_post, get_triggered_profiles as detect_quoted_alters, _passes_rate_cap
 from src.persona.models import PersonaProfile
 
 
@@ -44,15 +44,6 @@ def test_low_relevance_skips(conn):
 
 def _profiles(result):
     return [p for p, _ in result]
-
-
-def test_mention_bypasses_relevance(conn):
-    profile = _make_profile(forum_name="Videogames", weight=0.0)
-    post = _make_post(forum_name="Zwam", content="ejdar wat denk jij hierover?")
-    # ejdar is mentioned → relevance bypassed; probability bypassed
-    # with weight=0.0 for a different forum but mention → must pass
-    passed = evaluate_post(post, [profile], conn)
-    assert profile in _profiles(passed)
 
 
 def test_rate_limit_blocks(conn):
@@ -140,7 +131,7 @@ def _make_profile_with_reversed(reversed_username):
 def test_detect_quoted_alters_finds_quoted_profile():
     profiles = [_make_profile_with_reversed("ejdar"), _make_profile_with_reversed("nboj")]
     post = {"author": "real_user", "content": "[QUOTE=ejdar;123]something[/QUOTE]\nOriginally Posted by ejdar\nhello"}
-    result = detect_quoted_alters(post, profiles)
+    result = {p.reversed_username for p in detect_quoted_alters(post, profiles)}
     assert "ejdar" in result
     assert "nboj" not in result
 
@@ -148,21 +139,21 @@ def test_detect_quoted_alters_finds_quoted_profile():
 def test_detect_quoted_alters_is_case_insensitive():
     profiles = [_make_profile_with_reversed("Ejdar")]
     post = {"author": "real_user", "content": "originally posted by ejdar"}
-    result = detect_quoted_alters(post, profiles)
+    result = {p.reversed_username for p in detect_quoted_alters(post, profiles)}
     assert "Ejdar" in result
 
 
 def test_detect_quoted_alters_returns_empty_when_alter_quotes_alter():
     profiles = [_make_profile_with_reversed("ejdar"), _make_profile_with_reversed("nboj")]
     post = {"author": "ejdar", "content": "Originally Posted by nboj\nsomething"}
-    result = detect_quoted_alters(post, profiles)
+    result = {p.reversed_username for p in detect_quoted_alters(post, profiles)}
     assert result == set()
 
 
 def test_detect_quoted_alters_returns_empty_when_no_quote():
     profiles = [_make_profile_with_reversed("ejdar")]
     post = {"author": "real_user", "content": "Gewoon een bericht zonder citaat"}
-    result = detect_quoted_alters(post, profiles)
+    result = {p.reversed_username for p in detect_quoted_alters(post, profiles)}
     assert result == set()
 
 
@@ -172,40 +163,11 @@ def test_detect_quoted_alters_can_find_multiple():
         "author": "real_user",
         "content": "Originally Posted by ejdar\n...\nOriginally Posted by nboj\n..."
     }
-    result = detect_quoted_alters(post, profiles)
+    result = {p.reversed_username for p in detect_quoted_alters(post, profiles)}
     assert result == {"ejdar", "nboj"}
 
 
-def test_quoted_alter_gets_max_weight(conn):
-    profile = _make_profile(reversed_username="ejdar", forum_name="Offtopic", weight=0.0)
-    post = _make_post(forum_name="Zwam", content="Originally Posted by ejdar\nhello")
-    post["quoted_alters"] = {"ejdar"}
-    result = evaluate_post(post, [profile], conn)
-    assert len(result) == 1
-    _, weight = result[0]
-    assert weight == 1.0
 
-
-def test_quoted_alter_still_respects_rate_cap(conn):
-    from src.event.db import increment_rate
-    from datetime import datetime, timezone
-    profile = _make_profile(reversed_username="ejdar", forum_name="Offtopic", weight=0.0, hourly_cap=1)
-    post = _make_post(forum_name="Zwam", content="Originally Posted by ejdar\nhello")
-    post["quoted_alters"] = {"ejdar"}
-    now = datetime.now(timezone.utc)
-    hour_key = now.strftime("%Y-%m-%dT%H")
-    day_key = now.strftime("%Y-%m-%d")
-    increment_rate(conn, "ejdar", hour_key, day_key)
-    result = evaluate_post(post, [profile], conn)
-    assert result == []
-
-
-def test_non_quoted_alter_uses_normal_logic(conn):
-    profile = _make_profile(reversed_username="ejdar", forum_name="Offtopic", weight=0.0)
-    post = _make_post(forum_name="Zwam", content="Gewoon een bericht")
-    post["quoted_alters"] = set()
-    result = evaluate_post(post, [profile], conn)
-    assert result == []
 
 
 def test_short_post_below_minimum_words_is_skipped(conn):

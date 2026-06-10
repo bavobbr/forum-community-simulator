@@ -66,18 +66,53 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
 
         evaluated_posts.append(post)
 
+    available_pool = {p.reversed_username: p for p in profiles}
+
+    # Pass 1: Mentions
+    for post in evaluated_posts:
         if _is_image_only(post.get("content", "")):
             continue
 
+        if not sandbox_thread_ids:
+            quoted = set()
+            content_lower = post.get("content", "").lower()
+            for p in profiles:
+                if f"originally posted by {p.reversed_username.lower()}" in content_lower:
+                    quoted.add(p.reversed_username)
+            post["quoted_alters"] = quoted
+
+        triggered = gates.get_triggered_profiles(post, list(available_pool.values()))
+        post["triggered_alters"] = {p.reversed_username for p in triggered}
+
+        for profile in triggered[:5]:
+            if gates._passes_rate_cap(profile, conn):
+                candidates.append((post, profile, 1.0))
+                available_pool.pop(profile.reversed_username, None)
+
+    # Pass 2: Random / Topic
+    for post in evaluated_posts:
+        if _is_image_only(post.get("content", "")):
+            continue
+
+        # If post had ANY mentions, it's handled in Pass 1, do not assign random bots to it
+        if gates.get_triggered_profiles(post, profiles):
+            continue
+
+        if not available_pool:
+            break
+
         if sandbox_thread_ids:
-            for profile, weight in sandbox_gates.evaluate_post_sandbox(
-                post, profiles, conn, replies_per_post
-            ):
-                candidates.append((post, profile, weight))
+            random_candidates = sandbox_gates.evaluate_post_sandbox_random(
+                post, list(available_pool.values()), conn, replies_per_post
+            )
         else:
-            post["quoted_alters"] = gates.detect_quoted_alters(post, profiles)
-            for profile, weight in gates.evaluate_post(post, profiles, conn):
-                candidates.append((post, profile, weight))
+            random_candidates = gates.evaluate_post_random(
+                post, list(available_pool.values()), conn
+            )
+
+        for profile, weight in random_candidates:
+            candidates.append((post, profile, weight))
+            available_pool.pop(profile.reversed_username, None)
 
     # Phase 2: in forum-wide mode, cap by cycle limit; in sandbox mode, use all candidates
     if sandbox_thread_ids:
@@ -120,9 +155,10 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
                 logging.warning("Skipping quote-reply queuing for %s due to generation failure", profile.reversed_username)
                 continue
 
+            content_to_quote = gates._BBCODE_QUOTE_RE.sub("", post.get("content", "")).strip()
             quote_block = (
-                f"[QUOTE={post['author']};{post['post_id']}]"
-                f"{post.get('content', '')}"
+                f"[QUOTE={post['author']};{post['post_id']}]\n"
+                f"{content_to_quote}\n"
                 f"[/QUOTE]\n"
             )
             reply_text = quote_block + llm_reply
@@ -148,6 +184,15 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
             if reply_text.startswith("[generatie mislukt"):
                 logging.warning("Skipping reply queuing for %s due to generation failure", profile.reversed_username)
                 continue
+
+            if sandbox_thread_ids and profile.reversed_username in post.get("triggered_alters", set()):
+                content_to_quote = gates._BBCODE_QUOTE_RE.sub("", post.get("content", "")).strip()
+                quote_block = (
+                    f"[QUOTE={post['author']};{post['post_id']}]\n"
+                    f"{content_to_quote}\n"
+                    f"[/QUOTE]\n\n"
+                )
+                reply_text = quote_block + reply_text
 
         if bypass_approval:
             auto_approve_at = datetime.now(timezone.utc).isoformat()

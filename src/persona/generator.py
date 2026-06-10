@@ -4,7 +4,23 @@ from pathlib import Path
 from datetime import datetime
 from src.llm import call_llm_raw, MODEL_FLASH
 from src.persona.models import PersonaProfile, GeneratedReply
+import re
 
+def clean_legacy_quotes(content: str) -> str:
+    """Clean up legacy RAG database formatting dynamically."""
+    content = re.sub(
+        r'(?:Quote:|Citaat:)?\s*\[CITAAT\]\s*(?:Oorspronkelijk geplaatst door|Originally Posted by)\s+(.*?)\s*(?:View Post|Bekijk Bericht)\s*',
+        r'[CITAAT="\1"] ',
+        content
+    )
+    # Catch cases without "View Post"
+    content = re.sub(
+        r'(?:Quote:|Citaat:)?\s*\[CITAAT\]\s*(?:Oorspronkelijk geplaatst door|Originally Posted by)\s+([A-Za-z0-9_-]+)\s*',
+        r'[CITAAT="\1"] ',
+        content
+    )
+    content = re.sub(r'(?:Quote:|Citaat:)\s*\[CITAAT\]', '[CITAAT]', content)
+    return content
 
 def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = None) -> str:
     examples = "\n".join(f"- {p[:400]}" for p in profile.example_posts[:10])
@@ -12,10 +28,17 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
     opinions = "\n".join(f"- {o}" for o in profile.opinion_fingerprint) if profile.opinion_fingerprint else "- (geen)"
     patterns = "\n".join(f"- {p}" for p in profile.rhetorical_patterns) if profile.rhetorical_patterns else "- (geen)"
     import random
-    if profile.signature_phrases and random.random() < 0.25:
-        phrases = "\n".join(f"- {p}" for p in profile.signature_phrases)
+    if profile.signature_phrases and random.random() < 0.15:
+        phrases_section = (
+            f"### Typische uitspraken / Stopwoorden\n"
+            f"Je MAG maximaal één van de onderstaande stopwoorden gebruiken in dit bericht. Vaker dan dat klinkt als een karikatuur:\n"
+            + "\n".join(f"- {p}" for p in profile.signature_phrases) + "\n\n"
+        )
     else:
-        phrases = "- (gebruik GEEN stopwoorden voor dit specifieke bericht)"
+        phrases_section = (
+            f"### Typische uitspraken / Stopwoorden\n"
+            f"GEBRUIK IN DIT BERICHT ABSOLUUT GEEN CATCHPHRASES OF STOPWOORDEN. Schrijf een gewone, natuurlijke reactie.\n\n"
+        )
     peeves = "\n".join(f"- {p}" for p in profile.pet_peeves) if profile.pet_peeves else "- (geen)"
 
     known = {u: r for u, r in profile.frequent_interactions.items() if r in ("ally", "rival")}
@@ -36,11 +59,15 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
 
     dynamic_section = ""
     if dynamic_context:
-        dynamic_lines = "\n".join(f"- {p['content'][:400]}" for p in dynamic_context)
+        dynamic_lines = []
+        for p in dynamic_context:
+            content = clean_legacy_quotes(p['content'])
+            dynamic_lines.append(f"- {content[:400]}")
+            
         dynamic_section = (
             f"## Relevante Eerdere Berichten\n"
             f"Gebruik deze eerdere berichten UITSLUITEND om je Meningen en standpunten te bepalen, niet voor je schrijfstijl:\n"
-            f"{dynamic_lines}\n\n"
+            f"{chr(10).join(dynamic_lines)}\n\n"
         )
 
     return (
@@ -63,9 +90,7 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
         f"- Gedrag bij onenigheid/conflict: {profile.conflict_behavior or '(niet gespecificeerd)'}\n"
         f"- Humor en sarcasme: {profile.humor_and_sarcasm or '(niet gespecificeerd)'}\n"
         f"- Opmaakgewoontes: {profile.formatting_quirks or '(niet gespecificeerd)'}\n\n"
-        f"### Typische uitspraken / Stopwoorden\n"
-        f"Gebruik deze af en toe, en alleen als het natuurlijk voelt. Forceer ze niet in elke zin en gebruik er maximaal 1 per bericht, anders klinkt het als een karikatuur:\n"
-        f"{phrases}\n\n"
+        f"{phrases_section}"
         f"### Pet Peeves / Ergernissen\n"
         f"Onderwerpen die deze persoon snel irriteren of defensief maken:\n"
         f"{peeves}\n\n"
@@ -87,10 +112,10 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
         f"- Let op: Tekst tussen [CITAAT] en [/CITAAT] is eerdere context die de afzender aanhaalt. Je reageert op de daadwerkelijke reactie van de auteur buiten dit citaat.\n"
         f"- Schrijf ALTIJD in het Nederlands\n"
         f"- Blijf in karakter — geen vierde muur doorbreken\n"
-        f"- Subtiliteit is cruciaal: gebruik dialect, stopwoorden en retorische patronen natuurlijk en spaarzaam. Als je ze in elke zin propt, klink je als een typetje.\n"
+        f"- EXTREME SUBTILITEIT VEREIST: Gebruik dialect, stopwoorden en retorische patronen uiterst zeldzaam. Als je ze in elke zin propt, klink je als een typetje. Schrijf voornamelijk standaard Nederlands met slechts een héél subtiel vleugje persoonlijkheid.\n"
         f"- Verzin geen biografische feiten\n"
         f"- Bij een onbekend onderwerp: redeneer vanuit de wereldvisie en retorische patronen hierboven\n"
-        f"- Je mag VBulletin BBCode gebruiken (b, i, quote, url) als het bij de stijl past\n"
+        f"- Gebruik GEEN Markdown opmaak (zoals **vetgedrukt** of *cursief*). Schrijf uitsluitend platte tekst.\n"
         f"- De tekst '[afbeelding]' is een interne placeholder; schrijf NOOIT de tekst '[afbeelding]' in je eigen reacties.\n"
         f"- OVERDRIJF NIET met smilies. Sluit je bericht NIET standaard af met een smilie.\n"
         f"- Gebruik smilies uitsluitend als dit expliciet past bij de persoonlijkheid of formatting_quirks van dit profiel.\n"
@@ -98,7 +123,8 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
         f":) :-) ;-) :p ;p :'( :( 8=) 8-) :teeth: ;D :o :x :love: :rolleyes: :? ;) D:\n"
         f"- Schrijf smilies uitsluitend als één van de codes hierboven — nooit als woorden tussen haakjes\n"
         f"- Dit is een hechte community — de standaardtoon is warm, betrokken en enthousiast\n"
-        f"- BELANGRIJK: Deze persoon is 10+ jaar ouder geworden sinds de originele posts. Ze zijn nu milder, vriendelijker en volwassener.\n"
+        f"- BELANGRIJK: Deze persoon is 10 tot 15 jaar ouder geworden sinds de originele posts (en is nu gemiddeld 30 tot 40 jaar oud). Ze zijn milder, vriendelijker en volwassener.\n"
+        f"- Maak GEEN grappen of opmerkingen over 'oud zijn' of 'ouderdom' — ze zijn dertigers/veertigers, geen bejaarden.\n"
         f"- Tenzij je EXPLICIET en direct wordt aangevallen, is je basishouding vriendelijk, collegiaal en constructief.\n"
         f"- Reageer op enthousiasme met enthousiasme, op vragen met oprechte hulp, op goed nieuws met aanmoediging\n"
         f"- Sarcasme, cynisme of directe kritiek zijn alleen gepast als het écht bij de persoonlijkheid past én de situatie er expliciet om vraagt — schrijf dit nooit als standaardreactie\n"

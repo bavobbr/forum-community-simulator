@@ -10,7 +10,7 @@ _EXCLUDED_FORUM_IDS = {20, 29, 40, 42}
 _RELEVANCE_THRESHOLD = 0.2
 _MAX_RESPONDERS = 2
 _MIN_CONTENT_WORDS = 5
-_BBCODE_QUOTE_RE = re.compile(r"\[QUOTE[^\]]*\].*?\[/QUOTE\]", re.IGNORECASE | re.DOTALL)
+_BBCODE_QUOTE_RE = re.compile(r"\[(?:QUOTE|CITAAT)[^\]]*\].*?\[/(?:QUOTE|CITAAT)\]", re.IGNORECASE | re.DOTALL)
 _BBCODE_TAG_RE = re.compile(r"\[[^\]]*\]")
 
 
@@ -29,29 +29,32 @@ def is_meaningful(post: dict) -> bool:
     return len(stripped.split()) >= _MIN_CONTENT_WORDS
 
 
-def detect_quoted_alters(post: dict, profiles: list[PersonaProfile]) -> set[str]:
+def get_triggered_profiles(post: dict, profiles: list[PersonaProfile]) -> list[PersonaProfile]:
     all_reversed = {p.reversed_username for p in profiles}
     if post.get("author", "") in all_reversed:
-        return set()
-    content = post.get("content", "").lower()
-    quoted = set()
+        return []
+    content_lower = post.get("content", "").lower()
+    triggered = []
     for profile in profiles:
-        marker = f"originally posted by {profile.reversed_username.lower()}"
-        if marker in content:
-            quoted.add(profile.reversed_username)
-    return quoted
+        rev = profile.reversed_username.lower()
+        orig = profile.original_username.lower()
+        marker = f"originally posted by {rev}"
+        if (rev in content_lower
+                or orig in content_lower
+                or f"[quote={rev}" in content_lower
+                or f"[quote={orig}" in content_lower
+                or marker in content_lower):
+            triggered.append(profile)
+    return triggered
 
 
-def evaluate_post(
+def evaluate_post_random(
     post: dict,
-    profiles: list[PersonaProfile],
+    available_profiles: list[PersonaProfile],
     conn,
 ) -> list[tuple[PersonaProfile, float]]:
-    """Return up to 2 (profile, weight) pairs that should respond to this post.
-
-    Weight reflects relevance — callers can use it for cross-post prioritisation.
-    """
-    all_reversed = {p.reversed_username for p in profiles}
+    """Return up to 2 (profile, weight) pairs that should respond to this post from the available pool."""
+    all_reversed = {p.reversed_username for p in available_profiles}
     if post.get("author", "") in all_reversed:
         return []
 
@@ -66,21 +69,17 @@ def evaluate_post(
 
     passed: list[tuple[PersonaProfile, float]] = []
 
-    for profile in profiles:
-        if profile.reversed_username in post.get("quoted_alters", set()):
-            weight = 1.0
-        else:
-            mentioned = profile.reversed_username.lower() in content.lower()
-            tag_match = any(tag.lower() in content.lower() for tag in profile.interest_tags)
+    for profile in available_profiles:
+        tag_match = any(tag.lower() in content.lower() for tag in profile.interest_tags)
 
-            if not mentioned and not tag_match:
-                weight = profile.topic_weights.get(forum_name, 0.0)
-                if weight < _RELEVANCE_THRESHOLD:
-                    continue
-                if random.random() >= weight:
-                    continue
-            else:
-                weight = profile.topic_weights.get(forum_name, 1.0)
+        if not tag_match:
+            weight = profile.topic_weights.get(forum_name, 0.0)
+            if weight < _RELEVANCE_THRESHOLD:
+                continue
+            if random.random() >= weight:
+                continue
+        else:
+            weight = profile.topic_weights.get(forum_name, 1.0)
 
         if not _passes_rate_cap(profile, conn):
             logging.debug("Rate limit hit for %s", profile.reversed_username)

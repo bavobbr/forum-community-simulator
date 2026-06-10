@@ -43,17 +43,28 @@ def generate_embedding(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
     from concurrent.futures import ThreadPoolExecutor
+    import time
 
     embeddings = [None] * len(texts)
     def fetch_embedding(idx, text):
-        resp = _client.models.embed_content(
-            model="gemini-embedding-2",
-            contents=text,
-        )
-        embeddings[idx] = resp.embeddings[0].values
+        for attempt in range(3):
+            try:
+                resp = _client.models.embed_content(
+                    model="gemini-embedding-2",
+                    contents=text,
+                )
+                embeddings[idx] = resp.embeddings[0].values
+                return
+            except Exception as e:
+                if attempt == 2:
+                    raise
+                time.sleep(1 * (attempt + 1))
 
     with ThreadPoolExecutor(max_workers=20) as executor:
+        futures = []
         for idx, text in enumerate(texts):
-            executor.submit(fetch_embedding, idx, text)
+            futures.append(executor.submit(fetch_embedding, idx, text))
+        for future in futures:
+            future.result()
             
     return embeddings

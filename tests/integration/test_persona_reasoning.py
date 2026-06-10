@@ -5,7 +5,11 @@ from dotenv import load_dotenv
 from src.persona.models import PersonaProfile
 from src.persona.generator import generate_chat_reply
 
-load_dotenv()
+load_dotenv(override=True)
+import src.llm
+from google import genai
+if os.getenv("GOOGLE_API_KEY") and os.getenv("GOOGLE_API_KEY") != "test-api-key-for-unit-tests":
+    src.llm._client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 @pytest.fixture
 def test_profile():

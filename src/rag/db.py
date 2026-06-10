@@ -1,7 +1,12 @@
 import os
 import chromadb
 from chromadb.api.types import EmbeddingFunction, Documents, Embeddings
-from src.llm import generate_embedding
+import json
+from pydantic import BaseModel
+from src.llm import generate_embedding, call_llm_raw, MODEL_FLASH
+
+class RankedPosts(BaseModel):
+    post_ids: list[str]
 from src.persona.scraper import parse_post_date_timestamp
 
 class GeminiEmbeddingFunction(EmbeddingFunction):
@@ -73,6 +78,85 @@ def store_posts(username: str, posts: list[dict]):
             metadatas=metadatas
         )
 
+def rerank_posts(query: str, candidate_posts: list[dict]) -> list[dict]:
+    if not candidate_posts:
+        return []
+        
+    system_prompt = (
+        "You are an expert relevance ranking assistant for a Dutch shrimp-keeping forum.\n"
+        "Your task is to rank the provided list of historical posts based on how useful they would be as context to help an AI persona write a reply to the user's incoming query.\n\n"
+        "When ranking, consider:\n"
+        "1. Topical relevance: Do they discuss the same subjects (e.g., filters, water parameters, specific shrimp species)?\n"
+        "2. Factual usefulness: Does the historical post contain opinions or facts that apply to the incoming query?\n\n"
+        "Return the post_ids ordered from most relevant (1st) to least relevant (last)."
+    )
+    
+    candidates_json = []
+    for p in candidate_posts:
+        candidates_json.append({
+            "post_id": p.get("post_id", ""),
+            "content": p.get("content", "")
+        })
+        
+    user_prompt = (
+        f"INCOMING QUERY TO REPLY TO:\n{query}\n\n"
+        f"CANDIDATE HISTORICAL POSTS:\n{json.dumps(candidates_json, ensure_ascii=False, indent=2)}"
+    )
+    
+    try:
+        resp = call_llm_raw(
+            system=system_prompt,
+            user=user_prompt,
+            max_tokens=8192,
+            model=MODEL_FLASH,
+            response_schema=RankedPosts
+        )
+        raw_text = resp.text.strip() if resp.text else ""
+        if not raw_text:
+            return candidate_posts
+            
+        if raw_text.startswith("```json"):
+            raw_text = raw_text[7:]
+        elif raw_text.startswith("```"):
+            raw_text = raw_text[3:]
+        if raw_text.endswith("```"):
+            raw_text = raw_text[:-3]
+        raw_text = raw_text.strip()
+        
+        try:
+            ranked_data = json.loads(raw_text)
+            ranked_ids = ranked_data.get("post_ids", [])
+        except json.JSONDecodeError as e:
+            print(f"Error parsing JSON during reranking: {e}. Raw text: {repr(raw_text)}")
+            # Fallback: try to extract via regex in case of truncated response
+            import re
+            match = re.search(r'"post_ids"\s*:\s*\[(.*?)\]?', raw_text, re.DOTALL)
+            if match:
+                # Extract numbers/strings
+                ranked_ids = [x.strip(' \n\r\t"\'') for x in match.group(1).split(',') if x.strip(' \n\r\t"\'')]
+            else:
+                return candidate_posts
+        
+        # Ensure ids are strings
+        ranked_ids = [str(pid) for pid in ranked_ids]
+        
+        # Reorder candidate_posts based on ranked_ids
+        post_map = {str(p.get("post_id")): p for p in candidate_posts if p.get("post_id")}
+        reordered = []
+        for pid in ranked_ids:
+            if pid in post_map:
+                reordered.append(post_map[pid])
+                
+        # Append any posts that the model might have missed
+        missed_ids = set(post_map.keys()) - set(ranked_ids)
+        for pid in missed_ids:
+            reordered.append(post_map[pid])
+            
+        return reordered
+    except Exception as e:
+        print(f"Error during reranking: {e}")
+        return candidate_posts
+
 def search_posts(username: str, query: str, limit: int = 5) -> list[dict]:
     """Retrieve relevant historical posts for a user based on query."""
     collection = get_collection(username)
@@ -80,8 +164,9 @@ def search_posts(username: str, query: str, limit: int = 5) -> list[dict]:
     if collection.count() == 0:
         return []
         
-    # Chroma handles when n_results is greater than the collection size
-    actual_limit = min(limit, collection.count())
+    # Fetch a larger candidate pool for reranking
+    candidate_limit = max(20, limit)
+    actual_limit = min(candidate_limit, collection.count())
     
     results = collection.query(
         query_texts=[query],
@@ -103,7 +188,10 @@ def search_posts(username: str, query: str, limit: int = 5) -> list[dict]:
                 "thread_title": meta.get("thread_title", "")
             })
             
-    return posts
+    if posts:
+        posts = rerank_posts(query, posts)
+            
+    return posts[:limit]
 
 def drop_posts(username: str):
     """Delete the collection for a given user."""
