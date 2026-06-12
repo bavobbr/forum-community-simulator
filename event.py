@@ -18,6 +18,9 @@ from src.persona.models import PersonaProfile
 from src.session import VBulletinSession
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("google.genai").setLevel(logging.WARNING)
 
 
 def _load_profiles(personas_dir: str) -> list[PersonaProfile]:
@@ -81,11 +84,22 @@ def _poll_once(scanner, profiles, conn, alter_password, live_mode, cutoff,
                     quoted.add(p.reversed_username)
             post["quoted_alters"] = quoted
 
-        triggered = gates.get_triggered_profiles(post, list(available_pool.values()))
-        post["triggered_alters"] = {p.reversed_username for p in triggered}
+            triggered = gates.get_triggered_profiles(post, list(available_pool.values()))
+            post["triggered_alters"] = {p.reversed_username for p in triggered}
 
-        for profile in triggered[:5]:
-            if gates._passes_rate_cap(profile, conn):
+            for profile in triggered[:5]:
+                if gates._passes_rate_cap(profile, conn):
+                    candidates.append((post, profile, 1.0))
+                    available_pool.pop(profile.reversed_username, None)
+        else:
+            # Sandbox mode: always answer on direct mentions if meaningful, no rates, no limits
+            if not gates.is_meaningful(post):
+                continue
+
+            triggered = gates.get_triggered_profiles(post, profiles)
+            post["triggered_alters"] = {p.reversed_username for p in triggered}
+
+            for profile in triggered:
                 candidates.append((post, profile, 1.0))
                 available_pool.pop(profile.reversed_username, None)
 
@@ -277,7 +291,10 @@ def main():
 
         for entry in db.get_pending_auto_approve(conn):
             logging.info("Auto-approving reply %d for %s", entry["id"], entry["alter_username"])
-            _do_approve(conn, dict(entry), alter_password, live_mode, profile_map)
+            try:
+                _do_approve(conn, dict(entry), alter_password, live_mode, profile_map)
+            except Exception as exc:
+                logging.error("Auto-approve failed for reply %d: %s", entry["id"], exc)
 
         elapsed = time.time() - cycle_start
         time.sleep(max(0, poll_interval - elapsed))

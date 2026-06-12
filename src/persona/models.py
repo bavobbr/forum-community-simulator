@@ -61,6 +61,9 @@ class PersonaProfile:
     # Event orchestrator — None means manual approval only
     auto_approve_minutes: int | None = None
 
+    # Mystery guest flag
+    mystery_guest: bool = False
+
     @classmethod
     def from_alter_ego(cls, alter: dict) -> "PersonaProfile":
         return cls(
@@ -109,6 +112,7 @@ class PersonaProfile:
             pet_peeves=d.get("pet_peeves", []),
             formatting_quirks=d.get("formatting_quirks", ""),
             auto_approve_minutes=d.get("auto_approve_minutes", None),
+            mystery_guest=d.get("mystery_guest", False),
         )
 
 

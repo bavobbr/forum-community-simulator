@@ -37,7 +37,7 @@ def get_collection(username: str):
         embedding_function=GeminiEmbeddingFunction()
     )
 
-def store_posts(username: str, posts: list[dict]):
+def store_posts(username: str, posts: list[dict], progress_callback=None):
     """Embed and store posts for a user."""
     if not posts:
         return
@@ -72,11 +72,17 @@ def store_posts(username: str, posts: list[dict]):
         metadatas.append(meta)
         
     if ids:
-        collection.upsert(
-            ids=ids,
-            documents=documents,
-            metadatas=metadatas
-        )
+        batch_size = 100
+        total = len(ids)
+        for i in range(0, total, batch_size):
+            end_idx = min(i + batch_size, total)
+            collection.upsert(
+                ids=ids[i:end_idx],
+                documents=documents[i:end_idx],
+                metadatas=metadatas[i:end_idx]
+            )
+            if progress_callback:
+                progress_callback(end_idx, total)
 
 def rerank_posts(query: str, candidate_posts: list[dict]) -> list[dict]:
     if not candidate_posts:

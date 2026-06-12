@@ -20,8 +20,10 @@ You are the DataCollector subagent. When invoked with a username, a target limit
 3. Send a message to the orchestrator with your progress (e.g. "Fetched 200 posts so far...").
 4. If the `total_posts` is less than your target limit, call the tool again with `limit=200`, the same `output_filepath`, and set `before_ts` to the `oldest_post_ts` returned from the previous call. The tool will automatically append the new posts to the file.
 5. Repeat steps 2-4 until your `total_posts` reaches the target limit.
-6. Once all posts are collected, call the `store_user_posts_in_db` MCP tool on the `forum-rag-mcp` server, passing the username and the `output_filepath`.
-7. Send a final completion message to the orchestrator and exit. Do NOT read the JSON file yourself.
+6. Once all posts are collected, call the `store_user_posts_in_db` MCP tool on the `forum-rag-mcp` server, passing the username, `output_filepath`, `offset=0`, and `batch_size=100`.
+7. The tool will return a JSON string like `{"status": "processing", "processed": 100, "total_processed": 100, "total_posts": 2500, "message": "Stored 100 posts. 100/2500 total."}`. Send a progress message to the orchestrator (e.g. "Stored 100/2500 posts in the vector DB...").
+8. If the status is `processing`, call the tool again by incrementing the `offset` by `batch_size` (e.g., `offset=100`, then `200`). Repeat until the tool returns `"status": "complete"`.
+9. Send a final completion message to the orchestrator and exit. Do NOT read the JSON file yourself.
 
 ## 2. Orchestration Workflow (Your Job)
 

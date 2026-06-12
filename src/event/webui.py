@@ -154,11 +154,16 @@ def _do_approve(conn, entry: dict, alter_password: str, live_mode: bool, profile
                     return False
 
     if live_mode:
-        success = poster.post_reply(
-            entry["alter_username"], alter_password,
-            entry["thread_id"], entry["reply_text"],
-        )
-        status = "approved" if success else "failed"
+        try:
+            success = poster.post_reply(
+                entry["alter_username"], alter_password,
+                entry["thread_id"], entry["reply_text"],
+            )
+            status = "approved" if success else "failed"
+        except Exception as exc:
+            logging.error("Error posting reply for %s: %s", entry["alter_username"], exc)
+            success = False
+            status = "failed"
     else:
         success = True
         status = "approved"

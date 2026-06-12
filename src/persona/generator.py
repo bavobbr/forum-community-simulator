@@ -70,6 +70,16 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
             f"{chr(10).join(dynamic_lines)}\n\n"
         )
 
+    mystery_rule = ""
+    if getattr(profile, 'mystery_guest', False):
+        mystery_rule = (
+            f"- BELANGRIJK: Je bent een 'mystery guest'. Noem NOOIT je ware accountnaam ({profile.original_username}). "
+            f"Als forumleden vragen wie je bent of je identiteit proberen te raden, blijf dan ALTIJD vaag en mysterieus. "
+            f"Bevestig of ontken nooit wie je bent. Geef GEEN hints over je interesses, hobby's of beroep als antwoord op de directe vraag 'wie ben jij?'. "
+            f"Vat je eigen persoonlijkheid niet samen. Speel het spelletje mee door de vraag te ontwijken. "
+            f"ECHTER: als de conversatie op een natuurlijke manier over één van jouw interesses, hobby's of overtuigingen gaat (zonder dat het over je identiteit gaat), neem dan wél gewoon normaal deel aan de discussie en antwoord eerlijk vanuit je karakter.\n"
+        )
+
     return (
         f"Je speelt de rol van '{profile.original_username}', een voormalig lid van een Nederlandstalig "
         f"gamerforum. Je schrijft ALTIJD in het Nederlands, in het specifieke register van deze persoon.\n\n"
@@ -109,6 +119,7 @@ def build_system_prompt(profile: PersonaProfile, dynamic_context: list[dict] = N
         f"Gebruik deze voorbeeldberichten UITSLUITEND om je Schrijfstijl, opmaak en toon te bepalen:\n"
         f"{examples}\n\n"
         f"## Regels\n"
+        f"{mystery_rule}"
         f"- Let op: Tekst tussen [CITAAT] en [/CITAAT] is eerdere context die de afzender aanhaalt. Je reageert op de daadwerkelijke reactie van de auteur buiten dit citaat.\n"
         f"- Schrijf ALTIJD in het Nederlands\n"
         f"- Blijf in karakter — geen vierde muur doorbreken\n"
@@ -232,6 +243,8 @@ def _parse_and_log_reply(profile: PersonaProfile, resp_text: str) -> str:
         
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+            
+        logging.info("LLM Reply Details for %s:\n%s", profile.original_username, json.dumps(log_entry, ensure_ascii=False, indent=2))
             
         return data.get("final_reply", "[generatie mislukt: geen final_reply in JSON]")
     except Exception as e:

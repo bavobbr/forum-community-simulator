@@ -190,6 +190,7 @@ class PostScraper:
         enriched = []
         total = len(posts)
         for i, post in enumerate(posts):
+            _log.info("Fetching full content for post_id %d (%d/%d)", post["post_id"], i + 1, total)
             try:
                 html = self.session.get(f"showthread.php?p={post['post_id']}")
                 full = _extract_post_content(html, post["post_id"])
@@ -209,6 +210,7 @@ class PostScraper:
     def fetch_batch(self, user_id: int, page: int = 1) -> tuple[list[dict], bool]:
         """Fetch one page (100 posts) of a user's post history. Returns (posts, has_more_pages)."""
         search_id = self._ensure_search_id(user_id)
+        _log.info("fetch_batch: Fetching page %d for user_id %d", page, user_id)
         time.sleep(self.delay)
         html = self.session.get(f"search.php?searchid={search_id}&pp=100&page={page}")
         posts = parse_posts_page(html)
@@ -280,10 +282,13 @@ class PostScraper:
 
         posts: list[dict] = []
         for page in range(1, 100):
+            _log.info("fetch_window: Fetching page %d for search_id %s", page, search_id)
             time.sleep(self.delay)
+            _log.info("fetch_window: Requesting search.php for page %d", page)
             html = self.session.get(
                 f"search.php?searchid={search_id}&pp=100&page={page}"
             )
+            _log.info("fetch_window: Parsed page %d", page)
             batch = parse_posts_page(html)
             posts.extend(batch)
             if not batch or not parse_has_next_page(html):

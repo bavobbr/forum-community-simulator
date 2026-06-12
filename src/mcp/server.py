@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import logging
 from mcp.server.fastmcp import FastMCP, Context
 from dotenv import load_dotenv
 
@@ -13,12 +14,25 @@ from src.scraper.memberlist import parse_memberlist
 from src.scraper.profile import parse_last_active
 from src.persona.analyzer import _format_posts, _SCHEMA_DESCRIPTION, _apply_analysis, _select_examples
 from src.persona.models import PersonaProfile
+from src.mcp.trace import trace_tool
 
 load_dotenv()
 
 mcp = FastMCP("Forum Simulator MCP")
 
+log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../logs'))
+os.makedirs(log_dir, exist_ok=True)
+file_handler = logging.FileHandler(os.path.join(log_dir, "mcp_forum_server.log"))
+file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+
+logger = logging.getLogger("forum_server")
+logger.setLevel(logging.INFO)
+logger.handlers = []  # Clear any existing handlers
+logger.addHandler(file_handler)
+logger.propagate = False  # Prevent logs from bubbling up to root
+
 _session = None
+
 
 
 def get_session() -> VBulletinSession:
@@ -36,6 +50,7 @@ def get_session() -> VBulletinSession:
 
 
 @mcp.tool()
+@trace_tool(logger)
 def get_user_posts(username: str, limit: int = 100, before_ts: int | None = None, output_filepath: str | None = None, ctx: Context = None) -> str:
     """Fetch recent forum posts by a specific user.
     
@@ -47,26 +62,23 @@ def get_user_posts(username: str, limit: int = 100, before_ts: int | None = None
     """
     session = get_session()
     
-    log_filename = f"scrape_{username}_{int(time.time())}.log"
-    
     def on_progress(post_id: int, current: int, total: int):
-        if ctx and (current % 25 == 0 or current == total):
-            ctx.info(f"Scraping {username}: {current}/{total} full posts fetched...")
+        if current % 25 == 0 or current == total:
+            logger.info(f"Scraping {username}: {current}/{total} full posts fetched...")
+            if ctx:
+                ctx.info(f"Scraping {username}: {current}/{total} full posts fetched...")
             if hasattr(ctx, "report_progress"):
                 ctx.report_progress(current, total)
-        
-        try:
-            with open(log_filename, "a", encoding="utf-8") as f:
-                f.write(f"Read post_id: {post_id}\n")
-        except Exception:
-            pass
                 
     scraper = PostScraper(session, delay=6, progress_cb=on_progress)
     
     all_posts = []
     current_before_ts = before_ts
     
+    loop_count = 0
     while len(all_posts) < limit:
+        loop_count += 1
+        logger.info(f"get_user_posts loop iteration {loop_count}: fetching window for {username} before_ts={current_before_ts}, current posts={len(all_posts)}")
         window_posts, oldest_ts = scraper.fetch_window(username, before_ts=current_before_ts)
         if not window_posts:
             break
@@ -120,6 +132,7 @@ def get_user_posts(username: str, limit: int = 100, before_ts: int | None = None
 
 
 @mcp.tool()
+@trace_tool(logger)
 def get_thread_context(post_id: int, n: int = 5) -> str:
     """Fetch the most recent posts inside a thread, leading up to a specific post.
     
@@ -133,6 +146,7 @@ def get_thread_context(post_id: int, n: int = 5) -> str:
 
 
 @mcp.tool()
+@trace_tool(logger)
 def analyze_persona_from_file(username: str, filepath: str) -> str:
     """Reads a scratch JSON file of posts and builds the AI persona using the internal Python LLM SDK.
     
@@ -171,6 +185,8 @@ def analyze_persona_from_file(username: str, filepath: str) -> str:
             "last_active": ""
         }
         
+    logger.info(f"analyze_persona_from_file started LLM analysis for {username} ({len(posts)} posts)")
+        
     # Analyze ALL posts in one single batch (utilizing the large context window of Gemini 1.5 Pro)
     profile = analyze_first_batch(alter, posts)
     
@@ -180,6 +196,8 @@ def analyze_persona_from_file(username: str, filepath: str) -> str:
         
     with open(out_path, 'w', encoding='utf-8') as f:
         f.write(json.dumps(profile.to_dict(), ensure_ascii=False, indent=2))
+        
+    logger.info(f"analyze_persona_from_file successfully saved {username} profile to {out_path}")
     
     return json.dumps({
         "status": "success",
@@ -189,6 +207,7 @@ def analyze_persona_from_file(username: str, filepath: str) -> str:
 
 
 @mcp.tool()
+@trace_tool(logger)
 def save_approved_persona(username: str, llm_file: str, raw_posts_file: str, user_id: int | None = None, reversed_username: str | None = None, post_count: int | None = None, last_active: str | None = None) -> str:
     """Hydrates an LLM persona profile with identity fields and saves it to the agent_personas/ folder.
     
@@ -264,6 +283,7 @@ def save_approved_persona(username: str, llm_file: str, raw_posts_file: str, use
 
 
 @mcp.tool()
+@trace_tool(logger)
 def get_daily_activity() -> str:
     """Fetch the latest posts and active threads across the entire forum from the last 24h."""
     session = get_session()
@@ -272,6 +292,7 @@ def get_daily_activity() -> str:
 
 
 @mcp.tool()
+@trace_tool(logger)
 def post_reply(username: str, password: str, thread_id: int, message: str) -> bool:
     """Post a reply to a thread acting as a specific forum member.
     
@@ -285,6 +306,7 @@ def post_reply(username: str, password: str, thread_id: int, message: str) -> bo
 
 
 @mcp.resource("forum://memberlist/top100")
+@trace_tool(logger)
 def get_top_members() -> str:
     """Returns the top 100 members from the forum by post count."""
     session = get_session()
@@ -294,6 +316,7 @@ def get_top_members() -> str:
 
 
 @mcp.resource("forum://user/{user_id}/last_active")
+@trace_tool(logger)
 def get_user_last_active(user_id: int) -> str:
     """Returns the last active date of a user."""
     session = get_session()
@@ -304,6 +327,7 @@ def get_user_last_active(user_id: int) -> str:
 
 
 @mcp.tool()
+@trace_tool(logger)
 def simulate_chat_turn(username: str, message: str, rag_context: list | str | None = None, ctx: Context = None) -> str:
     """Simulates a chat turn by generating a reply as the persona.
     
@@ -373,6 +397,16 @@ def simulate_chat_turn(username: str, message: str, rag_context: list | str | No
     return reply
 
 
+
+@mcp.tool()
+@trace_tool(logger)
+def get_server_info() -> str:
+    """Returns information about the running server, including the log file location."""
+    import os
+    return json.dumps({
+        "log_file": os.path.abspath(os.path.join(os.path.dirname(__file__), '../../logs/mcp_forum_server.log')),
+        "status": "running"
+    })
 
 if __name__ == "__main__":
     mcp.run()

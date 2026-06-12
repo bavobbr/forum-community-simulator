@@ -15,6 +15,7 @@ def call_llm(system: str, user: str, max_tokens: int) -> str:
         config=types.GenerateContentConfig(
             system_instruction=system,
             max_output_tokens=max_tokens,
+            automatic_function_calling={"disable": True},
         ),
         contents=[user],
     )
@@ -27,6 +28,7 @@ def call_llm_raw(system: str, user: str, max_tokens: int, model: str = MODEL_FLA
     config_args = {
         "system_instruction": system,
         "max_output_tokens": max_tokens,
+        "automatic_function_calling": {"disable": True},
     }
     if response_schema:
         config_args["response_mime_type"] = "application/json"
@@ -44,12 +46,16 @@ def generate_embedding(texts: list[str]) -> list[list[float]]:
         return []
     from concurrent.futures import ThreadPoolExecutor
     import time
+    from google import genai
+    import os
+
+    local_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY", ""))
 
     embeddings = [None] * len(texts)
     def fetch_embedding(idx, text):
         for attempt in range(3):
             try:
-                resp = _client.models.embed_content(
+                resp = local_client.models.embed_content(
                     model="gemini-embedding-2",
                     contents=text,
                 )
@@ -60,7 +66,7 @@ def generate_embedding(texts: list[str]) -> list[list[float]]:
                     raise
                 time.sleep(1 * (attempt + 1))
 
-    with ThreadPoolExecutor(max_workers=20) as executor:
+    with ThreadPoolExecutor(max_workers=10) as executor:
         futures = []
         for idx, text in enumerate(texts):
             futures.append(executor.submit(fetch_embedding, idx, text))

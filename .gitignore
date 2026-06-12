@@ -19,3 +19,7 @@ event.db
 
 # Scraped post data (contains real user content)
 test_fetch_posts_results.json
+
+last_chat_prompt.txt
+last_event_prompt.txt
+Peephole.json
